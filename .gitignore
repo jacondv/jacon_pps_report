@@ -85,3 +85,4 @@ installer_output/
 # Local machine state (không commit)
 # ======================
 .exclusion_added
+.claude/scheduled_tasks.lock
