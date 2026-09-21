@@ -231,13 +231,6 @@ class NavigateTool(Tool):
         if self.ctx is not None:
             self.ctx.request_render()
 
-    # ------------------------------------------------------------------ helpers
-    def _viewport_size(self) -> Tuple[int, int]:
-        try:
-            return tuple(self.ctx.viewport.plotter.ren_win.GetSize())
-        except Exception:
-            return (1, 1)
-
     # ------------------------------------------------------------------ hit-testing
     def _hit_test(self, x: float, y: float) -> Optional[Tuple[str, str, bool]]:
         """(kind, object_id, draggable) for whatever's under (x, y), most

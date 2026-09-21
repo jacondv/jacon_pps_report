@@ -111,7 +111,7 @@ def test_select_by_thickness_and_extract_segment(main_window, sample_ply_path):
 
     assert main_window.document.selection.count() > 0
     # selection highlight actor was created by _on_selection_changed
-    assert main_window._selection_highlight_actor is not None
+    assert main_window.selection_renderer._actor is not None
 
     dock._on_extract_segment()
 

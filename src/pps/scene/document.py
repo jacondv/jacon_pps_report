@@ -160,8 +160,10 @@ class Document(QObject):
         self.layer_removed.emit(layer_id)
         return layer, index
 
-    def _rename_layer(self, layer_id: str, new_name: str) -> str:
+    def _rename_layer(self, layer_id: str, new_name: str) -> Optional[str]:
         layer = self.layer_manager.get_by_id(layer_id)
+        if layer is None:
+            return None
         old_name = layer.name
         layer.name = new_name
         self.mark_dirty()

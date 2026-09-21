@@ -14,15 +14,9 @@ from typing import Callable, Optional, Tuple
 from pps.render.picking import pick_nearest_point_3d
 from pps.scene.annotations import NoteAnnotation
 from pps.scene.commands import AddNoteCommand
-from pps.tools.base import MouseButton, PointerEvent, PointerEventType, Tool
+from pps.tools.base import MouseButton, PointerEvent, PointerEventType, Tool, default_note_editor
 
 NoteEditor = Callable[[Optional[NoteAnnotation], Tuple[float, float]], Optional[dict]]
-
-
-def _default_note_editor(existing: Optional[NoteAnnotation], screen_pos: Tuple[float, float]) -> Optional[dict]:
-    from pps.app.dialogs import open_note_editor
-
-    return open_note_editor(existing)
 
 
 class AnnotationTool(Tool):
@@ -33,7 +27,7 @@ class AnnotationTool(Tool):
 
     def __init__(self, note_editor: NoteEditor = None):
         super().__init__()
-        self.note_editor = note_editor or _default_note_editor
+        self.note_editor = note_editor or default_note_editor
 
     def status_hint(self) -> str:
         return "Click cloud: place annotation here  |  Esc: cancel"

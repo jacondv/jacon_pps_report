@@ -11,7 +11,7 @@ import numpy as np
 import vtk
 
 from pps.render.actors2d import polyline_actor
-from pps.render.labels import AnchoredLabel, hex_to_rgb
+from pps.render.labels import AnchoredLabel, hex_to_rgb, layer_visible as _layer_visible
 from pps.scene.measurements import AreaMeasurement, DistanceMeasurement
 
 Measurement = Union[DistanceMeasurement, AreaMeasurement]
@@ -142,10 +142,3 @@ class MeasurementRenderer:
 def _midpoint(p1: Tuple[float, float, float], p2: Tuple[float, float, float]) -> Tuple[float, float, float]:
     mid = (np.asarray(p1) + np.asarray(p2)) / 2.0
     return (float(mid[0]), float(mid[1]), float(mid[2]))
-
-
-def _layer_visible(layer_manager, layer_id) -> bool:
-    if layer_manager is None or layer_id is None:
-        return True
-    layer = layer_manager.get_by_id(layer_id)
-    return True if layer is None else layer.visible

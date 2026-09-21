@@ -14,7 +14,6 @@ from PySide6.QtCore import QSettings, Qt
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import QApplication, QFileDialog, QMainWindow, QMessageBox
 
-import pyvista as pv
 
 from pps.app.settings import AppSettings
 from pps.app.workers import AreaMeasureWorker, CalculationWorker
@@ -27,6 +26,7 @@ from pps.render.labels import hex_to_rgb
 from pps.render.layer_renderer import LayerRenderer
 from pps.render.measurement_renderer import MeasurementRenderer
 from pps.render.note_renderer import NoteRenderer
+from pps.render.selection_renderer import SelectionRenderer
 from pps.render.viewport import Viewport
 from pps.report import PDFGenerator
 from pps.scene.document import Document
@@ -74,7 +74,6 @@ class MainWindow(QMainWindow):
         self._point_size = self.settings_store.point_size
         self._calc_result = None
         self._thickness_dist = None
-        self._selection_highlight_actor = None
         self._area_workers = []  # keep QThreads alive while running
         self.current_project_path = None
 
@@ -85,6 +84,7 @@ class MainWindow(QMainWindow):
         self.viewport.set_background(self.settings_store.background_color)
 
         self.layer_renderer = LayerRenderer(self.viewport.plotter)
+        self.selection_renderer = SelectionRenderer(self.viewport.plotter)
         self.note_renderer = NoteRenderer(self.viewport.plotter, self.viewport.overlay)
         self.measurement_renderer = MeasurementRenderer(self.viewport.plotter, self.viewport.overlay)
         self.color_legend = ColorLegend(self.viewport.overlay_renderer)
@@ -416,23 +416,12 @@ class MainWindow(QMainWindow):
         self.viewport.render()
 
     def _on_selection_changed(self) -> None:
-        self._clear_selection_highlight()
         points, _distances = self.document.selection.get_points_and_distances()
-        if len(points):
-            cloud = pv.PolyData(points)
-            self._selection_highlight_actor = self.viewport.plotter.add_mesh(
-                cloud, color="yellow", point_size=self._point_size + 3,
-                render_points_as_spheres=True, opacity=0.9,
-            )
+        self.selection_renderer.sync(points, self._point_size)
         self.viewport.render()
 
     def _clear_selection_highlight(self) -> None:
-        if self._selection_highlight_actor is not None:
-            try:
-                self.viewport.plotter.remove_actor(self._selection_highlight_actor)
-            except Exception:
-                pass
-            self._selection_highlight_actor = None
+        self.selection_renderer.clear()
 
     def _on_note_upserted(self, note_id: str) -> None:
         note = self.document._find_note(note_id)
@@ -751,10 +740,6 @@ class MainWindow(QMainWindow):
 
     def _on_calc_failed(self, message: str) -> None:
         self._end_calc_busy_state()
-        # Known sharp edge (plan §7.1.6): if no point reaches the target
-        # thickness, the core calculation raises rather than silently
-        # returning zero. We surface it clearly here instead of "fixing"
-        # core behavior.
         QMessageBox.critical(
             self, "Calculation Error",
             f"Error occurred while calculating:\n{message}\n\n"
@@ -786,9 +771,10 @@ class MainWindow(QMainWindow):
         if not filepath:
             return
 
+        screenshot_fd, screenshot_path = tempfile.mkstemp(suffix=".png", prefix="pps_report_screenshot_")
+        os.close(screenshot_fd)
         try:
             self.statusBar().showMessage("Generating PDF report…")
-            screenshot_path = os.path.join(tempfile.gettempdir(), "pps_report_screenshot.png")
             self.viewport.screenshot(screenshot_path)
 
             ctx = {
@@ -819,6 +805,11 @@ class MainWindow(QMainWindow):
         except Exception as exc:
             logger.exception("Failed to generate report")
             QMessageBox.critical(self, "Error", f"Failed to generate report:\n{exc}")
+        finally:
+            try:
+                os.unlink(screenshot_path)
+            except OSError:
+                pass
 
     # ------------------------------------------------------------------ window state
     def _restore_window_state(self) -> None:

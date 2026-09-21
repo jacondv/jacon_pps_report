@@ -19,6 +19,7 @@ class HTMLPDFGenerator:
 
     def __init__(self, output_path):
         self.output_path = output_path
+        self._chart_path = None
 
     def generate(self, ctx):
         html = self._render_template(ctx)
@@ -46,10 +47,14 @@ class HTMLPDFGenerator:
             logger.error("wkhtmltopdf failed: %s", exc)
             raise RuntimeError(f"wkhtmltopdf failed: {exc}") from exc
         finally:
-            try:
-                os.unlink(html_path)
-            except OSError:
-                pass
+            for temp_path in (html_path, self._chart_path):
+                if temp_path is None:
+                    continue
+                try:
+                    os.unlink(temp_path)
+                except OSError:
+                    pass
+            self._chart_path = None
 
         return self.output_path
 
@@ -229,11 +234,12 @@ class HTMLPDFGenerator:
         ax.grid(axis='y', linestyle='--', alpha=0.3)
         plt.tight_layout()
 
-        tmp_dir = tempfile.gettempdir()
-        chart_path = os.path.join(tmp_dir, 'pps_report_distribution.png')
+        fd, chart_path = tempfile.mkstemp(suffix='.png', prefix='pps_report_distribution_')
+        os.close(fd)
         fig.savefig(chart_path, dpi=150)
         plt.close(fig)
         logger.debug("Saved distribution chart to: %s", chart_path)
+        self._chart_path = chart_path
         return chart_path
 
     def _escape_path(self, path):

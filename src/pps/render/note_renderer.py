@@ -7,7 +7,7 @@ removed/reset signal handlers.
 
 from typing import Dict, Iterable, Union
 
-from pps.render.labels import AnchoredLabel, ScreenLabel
+from pps.render.labels import AnchoredLabel, ScreenLabel, layer_visible as _layer_visible
 from pps.scene.annotations import NoteAnnotation
 
 
@@ -77,10 +77,3 @@ class NoteRenderer:
             label.set_pos_frac(pos_frac)
         elif offset_px is not None and isinstance(label, AnchoredLabel):
             label.set_offset(offset_px)
-
-
-def _layer_visible(layer_manager, layer_id) -> bool:
-    if layer_manager is None or layer_id is None:
-        return True
-    layer = layer_manager.get_by_id(layer_id)
-    return True if layer is None else layer.visible

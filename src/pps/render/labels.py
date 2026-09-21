@@ -334,3 +334,13 @@ class AnchoredLabel:
 
     def _apply_leader_color(self, color: str) -> None:
         self._leader_actor.GetProperty().SetColor(*hex_to_rgb(color))
+
+
+def layer_visible(layer_manager, layer_id) -> bool:
+    """Whether the layer an object (note/annotation/measurement) belongs to
+    is currently visible — objects with no layer_id (or an unknown one)
+    default to visible."""
+    if layer_manager is None or layer_id is None:
+        return True
+    layer = layer_manager.get_by_id(layer_id)
+    return True if layer is None else layer.visible

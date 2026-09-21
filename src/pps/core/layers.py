@@ -208,7 +208,16 @@ class LayerManager:
         """
         anchor_arr = np.asarray(anchor, dtype=np.float64)
         best_id, best_dist, best_is_original = None, float("inf"), True
-        for layer in self.visible_layers():
+
+        # Check segments before the original layer: they're point-for-point
+        # subsets of it (so an anchor picked on a segment matches at
+        # distance ~0 there too) and are typically far smaller. Once a
+        # non-original layer matches exactly, no other layer — including
+        # the potentially huge, unsegmented original cloud — can do better
+        # or change the tie-break, so stop scanning immediately instead of
+        # paying an O(n) pass over the original layer's full point array.
+        layers = sorted(self.visible_layers(), key=lambda l: l.is_original)
+        for layer in layers:
             if layer.num_points == 0:
                 continue
             min_dist = float(np.linalg.norm(layer.points - anchor_arr, axis=1).min())
@@ -216,6 +225,8 @@ class LayerManager:
                 best_dist = min_dist
                 best_id = layer.id
                 best_is_original = layer.is_original
+            if best_dist == 0.0 and not best_is_original:
+                break
         return best_id
 
     def active_layer_id(self) -> Optional[str]:

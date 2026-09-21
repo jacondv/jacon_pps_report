@@ -155,7 +155,8 @@ def calculate_area_and_volume(*args, method: str = "bpa", target_min=None) -> Ca
         reached_pcd = _to_open3d_pointcloud(None, _reached_points)
         reached_area = bpa_surface_area(reached_pcd, radii=(0.05, 0.1))  # m²
 
-    avg_thickness_mm = _reached_distances.mean() if len(_reached_distances) > 0 else 0
+    has_reached = len(_reached_distances) > 0
+    avg_thickness_mm = _reached_distances.mean() if has_reached else 0
 
     pcd = _to_open3d_pointcloud(cloud, points)
     total_area_m2 = bpa_surface_area(pcd,radii=(0.05, 0.1))
@@ -165,9 +166,9 @@ def calculate_area_and_volume(*args, method: str = "bpa", target_min=None) -> Ca
         surface_area_m2=total_area_m2,
         volume_m3=volume_m3,
         mean_thickness_mm=avg_thickness_mm,
-        min_thickness_mm=float(np.min(_reached_distances)),
-        max_thickness_mm=float(np.max(_reached_distances)),
-        std_thickness_mm=float(np.std(_reached_distances)),
+        min_thickness_mm=float(np.min(_reached_distances)) if has_reached else 0.0,
+        max_thickness_mm=float(np.max(_reached_distances)) if has_reached else 0.0,
+        std_thickness_mm=float(np.std(_reached_distances)) if has_reached else 0.0,
         num_points=len(points),
         area_reached_target_m2=reached_area
     )

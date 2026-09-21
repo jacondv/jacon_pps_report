@@ -141,3 +141,18 @@ class Tool(ABC):
     @property
     def scratch(self):
         return self._scratch
+
+    def _viewport_size(self) -> "tuple[int, int]":
+        try:
+            return tuple(self.ctx.viewport.plotter.ren_win.GetSize())
+        except Exception:
+            return (1, 1)
+
+
+def default_note_editor(existing, screen_pos):
+    """Open the standard note/annotation text editor dialog. The default
+    `note_editor` for both NoteTool and AnnotationTool; a caller (e.g. tests)
+    may pass a different callable instead."""
+    from pps.app.dialogs import open_note_editor
+
+    return open_note_editor(existing)
