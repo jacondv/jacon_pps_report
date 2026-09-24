@@ -4,9 +4,9 @@ number: 1
 title: Overview
 ---
 Jacon PPS Report reads a 3D point cloud (`.ply`) produced by the **Jacon
-PPS Scan** system, which scans a tunnel or mine face **before** shotcrete
+Pre-Post Scanner (PPS) System**, which scans a tunnel or mine face **before** shotcrete
 is sprayed (the *Pre-Scan*, the raw excavated rock surface) and again
-**after** spraying (the *Post-Scan*). The PPS Scan system computes the
+**after** spraying (the *Post-Scan*). The PPS System computes the
 perpendicular distance between the Post-Scan and Pre-Scan surfaces at
 every point and writes that signed thickness value into the `.ply` file.
 
@@ -18,7 +18,7 @@ segments, measure distances and areas, annotate findings directly on the
 model, compute summary statistics against a target thickness range, and
 produce a PDF report suitable for handing to a client or QA reviewer.
 
-The PPS Scan hardware itself is a LiDAR-based system: each Pre-Scan/Post-Scan
+The PPS System hardware itself is a LiDAR-based system: each Pre-Scan/Post-Scan
 pass takes about 50 seconds, with a rated measurement accuracy of ±17 mm
 and a valid thickness measurement range of 0–300 mm at up to 10 m scanning
 distance. Keep that 0–300 mm range in mind when reviewing results — a
@@ -28,7 +28,7 @@ shotcrete.
 
 Typical end-to-end workflow:
 
-1. Open the post-processed `.ply` scan file (already carries per-point thickness from the PPS Scan system).
+1. Open the post-processed `.ply` scan file (already carries per-point thickness from the PPS System).
 2. Review / adjust the target thickness range (Min / Max).
 3. Optionally select and extract one or more segments of interest.
 4. Measure distances or areas, and place Notes/Annotations to document findings.

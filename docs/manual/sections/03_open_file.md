@@ -3,7 +3,7 @@ id: open-file
 number: 3
 title: Opening a PLY File
 ---
-Use `File → Open PLY…` (<kbd>Ctrl</kbd>+<kbd>O</kbd>) or the **Open PLY** button on the main toolbar, and choose a `.ply` file that already contains per-point thickness values computed by the PPS Scan system (the Post-Scan surface compared against the Pre-Scan rough surface — not a CAD design profile).
+Use `File → Open PLY…` (<kbd>Ctrl</kbd>+<kbd>O</kbd>) or the **Open PLY** button on the main toolbar, and choose a `.ply` file that already contains per-point thickness values computed by the PPS System (the Post-Scan surface compared against the Pre-Scan rough surface — not a CAD design profile).
 
 ### Filename & folder convention
 

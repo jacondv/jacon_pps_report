@@ -310,9 +310,9 @@
     <section id="overview">
       <h2><span class="num">1</span> Overview</h2>
       <p>Jacon PPS Report reads a 3D point cloud (<code>.ply</code>) produced by the <strong>Jacon
-      PPS Scan</strong> system, which scans a tunnel or mine face <strong>before</strong> shotcrete
+      Pre-Post Scanner (PPS) System</strong>, which scans a tunnel or mine face <strong>before</strong> shotcrete
       is sprayed (the <em>Pre-Scan</em>, the raw excavated rock surface) and again
-      <strong>after</strong> spraying (the <em>Post-Scan</em>). The PPS Scan system computes the
+      <strong>after</strong> spraying (the <em>Post-Scan</em>). The PPS System computes the
       perpendicular distance between the Post-Scan and Pre-Scan surfaces at
       every point and writes that signed thickness value into the <code>.ply</code> file.</p>
       <p>Jacon PPS Report does <strong>not</strong> perform that Pre-Scan/Post-Scan comparison
@@ -322,7 +322,7 @@
       segments, measure distances and areas, annotate findings directly on the
       model, compute summary statistics against a target thickness range, and
       produce a PDF report suitable for handing to a client or QA reviewer.</p>
-      <p>The PPS Scan hardware itself is a LiDAR-based system: each Pre-Scan/Post-Scan
+      <p>The PPS System hardware itself is a LiDAR-based system: each Pre-Scan/Post-Scan
       pass takes about 50 seconds, with a rated measurement accuracy of ±17 mm
       and a valid thickness measurement range of 0–300 mm at up to 10 m scanning
       distance. Keep that 0–300 mm range in mind when reviewing results — a
@@ -331,7 +331,7 @@
       shotcrete.</p>
       <p>Typical end-to-end workflow:</p>
       <ol>
-      <li>Open the post-processed <code>.ply</code> scan file (already carries per-point thickness from the PPS Scan system).</li>
+      <li>Open the post-processed <code>.ply</code> scan file (already carries per-point thickness from the PPS System).</li>
       <li>Review / adjust the target thickness range (Min / Max).</li>
       <li>Optionally select and extract one or more segments of interest.</li>
       <li>Measure distances or areas, and place Notes/Annotations to document findings.</li>
@@ -391,7 +391,7 @@
 
     <section id="open-file">
       <h2><span class="num">3</span> Opening a PLY File</h2>
-      <p>Use <code>File → Open PLY…</code> (<kbd>Ctrl</kbd>+<kbd>O</kbd>) or the <strong>Open PLY</strong> button on the main toolbar, and choose a <code>.ply</code> file that already contains per-point thickness values computed by the PPS Scan system (the Post-Scan surface compared against the Pre-Scan rough surface — not a CAD design profile).</p>
+      <p>Use <code>File → Open PLY…</code> (<kbd>Ctrl</kbd>+<kbd>O</kbd>) or the <strong>Open PLY</strong> button on the main toolbar, and choose a <code>.ply</code> file that already contains per-point thickness values computed by the PPS System (the Post-Scan surface compared against the Pre-Scan rough surface — not a CAD design profile).</p>
       <h3>Filename &amp; folder convention</h3>
       <p>If the file lives under a path shaped like <code>…/Projects/&lt;ProjectName&gt;/&lt;JobNumber&gt;/&lt;JobNumber&gt;#&lt;yyyyMMdd_hhmmss&gt;#&lt;SegmentName&gt;.ply</code>, the project name, job number, scan timestamp and segment name are parsed automatically and shown in the <strong>Properties</strong> dock, and reused to build the default PDF report filename. If the path doesn't match this convention, the file still loads normally — the project/job fields simply fall back to the folder and file names as-is.</p>
       <h3>Default target range</h3>
@@ -654,7 +654,7 @@
       <li><strong>Above Target Max</strong> (default: blue) — over-sprayed beyond the target.</li>
       </ul>
       <div class="callout warn">
-      <strong>Note:</strong> thickness values with an absolute magnitude below 12 mm are treated as no measurable deviation, and values above 500 mm are treated as scan noise — both are excluded from the "reached target" statistics. The PPS Scan hardware's own valid measurement range is 0–300 mm, so the 500 mm cutoff is a deliberately generous software-side margin above that — it only catches genuine scan artifacts (e.g. reflections), not real thickness readings.
+      <strong>Note:</strong> thickness values with an absolute magnitude below 12 mm are treated as no measurable deviation, and values above 500 mm are treated as scan noise — both are excluded from the "reached target" statistics. The PPS System hardware's own valid measurement range is 0–300 mm, so the 500 mm cutoff is a deliberately generous software-side margin above that — it only catches genuine scan artifacts (e.g. reflections), not real thickness readings.
       </div>
     </section>
 

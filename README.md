@@ -1,6 +1,6 @@
 # Jacon PPS Report
 
-Phần mềm hậu xử lý và xuất báo cáo cho dữ liệu quét Point Cloud (.ply) từ hệ thống **Jacon PPS Scan** — hệ này quét bề mặt hầm/mỏ trước khi phun bê tông (Pre-Scan, bề mặt đá thô) và sau khi phun (Post-Scan), rồi tự tính sẵn độ dày (khoảng cách vuông góc Post-Scan so với Pre-Scan) tại từng điểm và ghi vào file .ply. PPS Report đọc file .ply đã có sẵn độ dày đó để hiển thị 3D, chọn vùng/tách segment, đo đạc, ghi chú, tính toán thống kê và xuất báo cáo PDF — phần mềm không tự tính toán so sánh Pre/Post-Scan.
+Phần mềm hậu xử lý và xuất báo cáo cho dữ liệu quét Point Cloud (.ply) từ hệ thống **Jacon Pre-Post Scanner (PPS) System** — hệ này quét bề mặt hầm/mỏ trước khi phun bê tông (Pre-Scan, bề mặt đá thô) và sau khi phun (Post-Scan), rồi tự tính sẵn độ dày (khoảng cách vuông góc Post-Scan so với Pre-Scan) tại từng điểm và ghi vào file .ply. PPS Report đọc file .ply đã có sẵn độ dày đó để hiển thị 3D, chọn vùng/tách segment, đo đạc, ghi chú, tính toán thống kê và xuất báo cáo PDF — phần mềm không tự tính toán so sánh Pre/Post-Scan.
 
 Xem hướng dẫn sử dụng đầy đủ (có hình minh họa) ngay trong ứng dụng qua `Help → User Guide`.
 
