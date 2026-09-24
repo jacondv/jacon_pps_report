@@ -33,6 +33,8 @@ __pycache__/
 # FILES
 # ======================
 *.pdf
+!docs/manual/User_Guide.pdf
+!src/pps/ui/help/User_Guide.pdf
 *.ply
 # ======================
 # IDE / Editor

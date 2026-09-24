@@ -12,6 +12,7 @@ Left-drag to orbit, right-drag or scroll to zoom, middle-drag to pan. The view-o
 ```figure
 image: navigation_tool_toolbar.png
 caption: Tool toolbar: Navigate, Select, Distance, Area, Note, Annotation.
+width: 60%
 ```
 
 | Tool | Shortcut | What it does |

@@ -297,7 +297,7 @@
 
     <section id="warning">
       <div class="warning-box">
-        <div class="warning-head"><span class="tri">&#9888;</span><span class="text">WARNING</span></div>
+        <div class="warning-head"><span class="tri">&#9650;</span><span class="text">WARNING</span></div>
         <div class="warning-body">
           <p>To prevent serious injury and machine damage, only trained personnel should install replacement parts.</p>
           <p>Only genuine replacement parts should be used to repair Jacon machinery.</p>
@@ -314,7 +314,7 @@
       is sprayed (the <em>Pre-Scan</em>, the raw excavated rock surface) and again
       <strong>after</strong> spraying (the <em>Post-Scan</em>). The PPS System computes the
       perpendicular distance between the Post-Scan and Pre-Scan surfaces at
-      every point and writes that signed thickness value into the <code>.ply</code> file.</p>
+      every point and writes that thickness value into the <code>.ply</code> file.</p>
       <p>Jacon PPS Report does <strong>not</strong> perform that Pre-Scan/Post-Scan comparison
       itself — its job is post-processing and reporting on data that already
       carries per-point thickness. It colors the cloud by thickness, lets you
@@ -322,13 +322,6 @@
       segments, measure distances and areas, annotate findings directly on the
       model, compute summary statistics against a target thickness range, and
       produce a PDF report suitable for handing to a client or QA reviewer.</p>
-      <p>The PPS System hardware itself is a LiDAR-based system: each Pre-Scan/Post-Scan
-      pass takes about 50 seconds, with a rated measurement accuracy of ±17 mm
-      and a valid thickness measurement range of 0–300 mm at up to 10 m scanning
-      distance. Keep that 0–300 mm range in mind when reviewing results — a
-      reported thickness far outside it (see the noise note in
-      <a href="#calculate">Calculation &amp; Targets</a>) points to a scan artifact, not real
-      shotcrete.</p>
       <p>Typical end-to-end workflow:</p>
       <ol>
       <li>Open the post-processed <code>.ply</code> scan file (already carries per-point thickness from the PPS System).</li>
@@ -449,7 +442,7 @@
       <h3>Camera controls</h3>
       <p>Left-drag to orbit, right-drag or scroll to zoom, middle-drag to pan. The view-orientation buttons on the right side of the tool toolbar (<strong>Reset, Top, Bottom, Front, Back, Right, Left, Iso</strong>) snap the camera to standard viewpoints.</p>
       <h3>The six tools</h3>
-      <figure>
+      <figure style="max-width:60%;margin-left:auto;margin-right:auto;">
               <img src="images/navigation_tool_toolbar.png" alt="">
               <figcaption>
                 Tool toolbar: Navigate, Select, Distance, Area, Note, Annotation.
@@ -561,14 +554,19 @@
 
     <section id="project-tree">
       <h2><span class="num">9</span> The Project Tree</h2>
+      <div class="grid-2">
+      <div>
       <p>The <strong>Project</strong> dock on the left shows every segment (layer) as a top-level row, with its Notes, Annotations and measurements nested underneath as child rows. Toggling a segment's checkbox hides or shows everything nested inside it in one action.</p>
-      <figure>
+      <p>Selecting multiple rows (<kbd>Ctrl</kbd>/<kbd>Shift</kbd>-click) enables a bulk <strong>Delete</strong> action, applied as a single undo step. Notes/measurements with no owning segment (for example, after their segment was deleted) are grouped under an <strong>(Unassigned)</strong> entry rather than being lost.</p>
+      </div>
+      <figure style="margin:0;">
               <img src="images/project_tree.png" alt="">
               <figcaption>
                 Project tree, checkboxes control visibility; right-click a
         segment to Rename/Delete, or an object to Edit/Move/Hide/Delete.
               </figcaption>
             </figure>
+      </div>
       <table>
       <thead>
       <tr>
@@ -591,7 +589,6 @@
       </tr>
       </tbody>
       </table>
-      <p>Selecting multiple rows (<kbd>Ctrl</kbd>/<kbd>Shift</kbd>-click) enables a bulk <strong>Delete</strong> action, applied as a single undo step. Notes/measurements with no owning segment (for example, after their segment was deleted) are grouped under an <strong>(Unassigned)</strong> entry rather than being lost.</p>
     </section>
 
     <section id="calculate">
@@ -679,7 +676,17 @@
 
     <section id="settings">
       <h2><span class="num">12</span> Application Settings</h2>
-      <p>Open <code>Settings → Preferences…</code> to configure:</p>
+      <div class="grid-2">
+      <div>
+      <p>Open <code>Settings → Preferences…</code> to configure theme, point size, thickness classification colors, 3D view background, report title/logo, and PDF auto-open. These preferences are stored per-user and persist across sessions and across different point cloud files.</p>
+      </div>
+      <figure style="margin:0;">
+              <img src="images/settings_dialog.png" alt="">
+              <figcaption>
+                The Settings dialog, including the PDF Export auto-open option.
+              </figcaption>
+            </figure>
+      </div>
       <table>
       <thead>
       <tr>
@@ -718,13 +725,6 @@
       </tr>
       </tbody>
       </table>
-      <p>These preferences are stored per-user and persist across sessions and across different point cloud files.</p>
-      <figure>
-              <img src="images/settings_dialog.png" alt="">
-              <figcaption>
-                The Settings dialog, including the PDF Export auto-open option.
-              </figcaption>
-            </figure>
     </section>
 
     <section id="undo">
@@ -735,6 +735,42 @@
 
     <section id="shortcuts">
       <h2><span class="num">14</span> Keyboard Shortcuts</h2>
+      <h3>Tools</h3>
+      <table>
+      <thead>
+      <tr>
+      <th>Shortcut</th>
+      <th>Tool</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td><kbd>V</kbd> / <kbd>1</kbd></td>
+      <td>Navigate</td>
+      </tr>
+      <tr>
+      <td><kbd>S</kbd> / <kbd>2</kbd></td>
+      <td>Select</td>
+      </tr>
+      <tr>
+      <td><kbd>D</kbd> / <kbd>3</kbd></td>
+      <td>Distance</td>
+      </tr>
+      <tr>
+      <td><kbd>A</kbd> / <kbd>4</kbd></td>
+      <td>Area</td>
+      </tr>
+      <tr>
+      <td><kbd>N</kbd> / <kbd>5</kbd></td>
+      <td>Note</td>
+      </tr>
+      <tr>
+      <td><kbd>G</kbd> / <kbd>6</kbd></td>
+      <td>Annotation</td>
+      </tr>
+      </tbody>
+      </table>
+      <h3>General</h3>
       <table>
       <thead>
       <tr>
@@ -743,14 +779,6 @@
       </tr>
       </thead>
       <tbody>
-      <tr>
-      <td><kbd>1</kbd> – <kbd>6</kbd></td>
-      <td>Switch to Navigate / Select / Distance / Area / Note / Annotation</td>
-      </tr>
-      <tr>
-      <td><kbd>V</kbd> <kbd>S</kbd> <kbd>D</kbd> <kbd>A</kbd> <kbd>N</kbd> <kbd>G</kbd></td>
-      <td>Mnemonic shortcuts for the same six tools</td>
-      </tr>
       <tr>
       <td><kbd>Esc</kbd></td>
       <td>Cancel the in-progress action; press again to return to Navigate</td>

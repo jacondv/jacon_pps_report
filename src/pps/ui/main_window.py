@@ -41,7 +41,7 @@ from pps.tools.note import NoteTool
 from pps.tools.region_select import RegionSelectTool
 from pps.ui.dialogs.about_dialog import show_about
 from pps.ui.dialogs.settings_dialog import SettingsDialog
-from pps.ui.dialogs.user_guide import open_user_guide
+from pps.ui.dialogs.user_guide import open_user_guide, open_user_guide_pdf
 from pps.ui.widgets.inline_note_editor import open_inline_note_editor
 from pps.ui.widgets.spinner import Spinner
 from pps.ui.docks.project_dock import ProjectDock
@@ -322,6 +322,9 @@ class MainWindow(QMainWindow):
         action_user_guide = QAction("User Guide", self)
         action_user_guide.triggered.connect(lambda: open_user_guide(self))
         help_menu.addAction(action_user_guide)
+        action_user_guide_pdf = QAction("User Guide (PDF)", self)
+        action_user_guide_pdf.triggered.connect(lambda: open_user_guide_pdf(self))
+        help_menu.addAction(action_user_guide_pdf)
         help_menu.addSeparator()
         action_about = QAction("About", self)
         action_about.triggered.connect(lambda: show_about(self))
