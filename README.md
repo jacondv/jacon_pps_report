@@ -1,6 +1,6 @@
 # Jacon PPS Report
 
-Phần mềm phân tích độ dày bê tông phun đường hầm (shotcrete) từ dữ liệu quét Point Cloud (.ply) đã được so sánh với thiết kế — hiển thị 3D, chọn vùng/tách segment, đo đạc, ghi chú, tính toán thống kê và xuất báo cáo PDF.
+Phần mềm hậu xử lý và xuất báo cáo cho dữ liệu quét Point Cloud (.ply) từ hệ thống **Jacon PPS Scan** — hệ này quét bề mặt hầm/mỏ trước khi phun bê tông (Pre-Scan, bề mặt đá thô) và sau khi phun (Post-Scan), rồi tự tính sẵn độ dày (khoảng cách vuông góc Post-Scan so với Pre-Scan) tại từng điểm và ghi vào file .ply. PPS Report đọc file .ply đã có sẵn độ dày đó để hiển thị 3D, chọn vùng/tách segment, đo đạc, ghi chú, tính toán thống kê và xuất báo cáo PDF — phần mềm không tự tính toán so sánh Pre/Post-Scan.
 
 Xem hướng dẫn sử dụng đầy đủ (có hình minh họa) ngay trong ứng dụng qua `Help → User Guide`.
 
@@ -94,7 +94,11 @@ PPS_Report_PC/
 │   └── utils/                # Helper chung (resource path, timing…)
 ├── tests/                  # pytest + pytest-qt
 ├── sample/                 # File PLY mẫu để test/demo
-└── docs/REFACTOR_PLAN.md  # Kế hoạch & lịch sử refactor
+└── docs/
+    ├── REFACTOR_PLAN.md    # Kế hoạch & lịch sử refactor
+    └── manual/             # Nguồn User Guide (Markdown + images/) — build_manual.py
+                             #   sinh ra src/pps/ui/help/user_guide.html, sửa ở đây,
+                             #   đừng sửa trực tiếp file .html
 ```
 
 ## Lưu ý

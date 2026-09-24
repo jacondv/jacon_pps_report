@@ -1,5 +1,8 @@
-"""Opens the bundled HTML user guide (docs/help — screenshots and text
-baked into one self-contained file) in the system's default browser."""
+"""Opens the bundled HTML user guide in the system's default browser.
+
+The guide (user_guide.html + images/) is built from docs/manual/ — see
+docs/manual/build_manual.py. Do not edit user_guide.html by hand; edit the
+Markdown sections instead and rebuild."""
 
 import os
 

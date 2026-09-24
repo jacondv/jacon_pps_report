@@ -27,3 +27,4 @@ Pillow>=9.0.0
 # Dev / tests
 pytest>=7.0.0
 pytest-qt>=4.2.0
+markdown>=3.5.0  # docs/manual/build_manual.py only, not used at app runtime
