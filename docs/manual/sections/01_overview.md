@@ -18,6 +18,14 @@ segments, measure distances and areas, annotate findings directly on the
 model, compute summary statistics against a target thickness range, and
 produce a PDF report suitable for handing to a client or QA reviewer.
 
+The PPS Scan hardware itself is a LiDAR-based system: each Pre-Scan/Post-Scan
+pass takes about 50 seconds, with a rated measurement accuracy of ±17 mm
+and a valid thickness measurement range of 0–300 mm at up to 10 m scanning
+distance. Keep that 0–300 mm range in mind when reviewing results — a
+reported thickness far outside it (see the noise note in
+[Calculation & Targets](#calculate)) points to a scan artifact, not real
+shotcrete.
+
 Typical end-to-end workflow:
 
 1. Open the post-processed `.ply` scan file (already carries per-point thickness from the PPS Scan system).

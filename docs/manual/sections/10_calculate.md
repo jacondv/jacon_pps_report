@@ -39,5 +39,5 @@ The three color classes correspond to the colors configured in [Settings](#setti
 - **Above Target Max** (default: blue) — over-sprayed beyond the target.
 
 <div class="callout warn">
-<strong>Note:</strong> thickness values with an absolute magnitude below 12 mm are treated as no measurable deviation, and values above 500 mm are treated as scan noise — both are excluded from the "reached target" statistics.
+<strong>Note:</strong> thickness values with an absolute magnitude below 12 mm are treated as no measurable deviation, and values above 500 mm are treated as scan noise — both are excluded from the "reached target" statistics. The PPS Scan hardware's own valid measurement range is 0–300 mm, so the 500 mm cutoff is a deliberately generous software-side margin above that — it only catches genuine scan artifacts (e.g. reflections), not real thickness readings.
 </div>

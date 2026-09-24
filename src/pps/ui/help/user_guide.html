@@ -322,6 +322,13 @@
       segments, measure distances and areas, annotate findings directly on the
       model, compute summary statistics against a target thickness range, and
       produce a PDF report suitable for handing to a client or QA reviewer.</p>
+      <p>The PPS Scan hardware itself is a LiDAR-based system: each Pre-Scan/Post-Scan
+      pass takes about 50 seconds, with a rated measurement accuracy of ±17 mm
+      and a valid thickness measurement range of 0–300 mm at up to 10 m scanning
+      distance. Keep that 0–300 mm range in mind when reviewing results — a
+      reported thickness far outside it (see the noise note in
+      <a href="#calculate">Calculation &amp; Targets</a>) points to a scan artifact, not real
+      shotcrete.</p>
       <p>Typical end-to-end workflow:</p>
       <ol>
       <li>Open the post-processed <code>.ply</code> scan file (already carries per-point thickness from the PPS Scan system).</li>
@@ -647,7 +654,7 @@
       <li><strong>Above Target Max</strong> (default: blue) — over-sprayed beyond the target.</li>
       </ul>
       <div class="callout warn">
-      <strong>Note:</strong> thickness values with an absolute magnitude below 12 mm are treated as no measurable deviation, and values above 500 mm are treated as scan noise — both are excluded from the "reached target" statistics.
+      <strong>Note:</strong> thickness values with an absolute magnitude below 12 mm are treated as no measurable deviation, and values above 500 mm are treated as scan noise — both are excluded from the "reached target" statistics. The PPS Scan hardware's own valid measurement range is 0–300 mm, so the 500 mm cutoff is a deliberately generous software-side margin above that — it only catches genuine scan artifacts (e.g. reflections), not real thickness readings.
       </div>
     </section>
 
