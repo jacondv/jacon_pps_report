@@ -73,10 +73,12 @@ class MainWindow(QMainWindow):
         self._point_size = self.settings_store.point_size
         self._calc_result = None
         self._thickness_dist = None
+        self._calc_result_inputs = None  # _calc_inputs() the result was computed from
         # Export PDF asked to calculate first; continue the export once the
         # calculation finishes.
         self._export_after_calc = False
         self._calc_worker = None
+        self._calc_worker_inputs = None
         self._area_workers = []  # keep QThreads alive while running
         self.current_project_path = None
 
@@ -384,20 +386,24 @@ class MainWindow(QMainWindow):
         self.color_legend.set_visible(has_cloud)
         self._calc_result = None
         self._thickness_dist = None
+        self._calc_result_inputs = None
         self.results_dock.clear_result()
         self.viewport.render()
 
     def _on_layer_added(self, layer_id: str) -> None:
+        self._discard_stale_calculation()
         layer = self.document.layer_manager.get_by_id(layer_id)
         if layer is not None:
             self.layer_renderer.sync(layer, self.document.target_min, self.document.target_max, self._point_size)
             self.viewport.render()
 
     def _on_layer_removed(self, layer_id: str) -> None:
+        self._discard_stale_calculation()
         self.layer_renderer.remove(layer_id)
         self.viewport.render()
 
     def _on_layer_changed(self, layer_id: str) -> None:
+        self._discard_stale_calculation()
         layer = self.document.layer_manager.get_by_id(layer_id)
         if layer is not None:
             self.layer_renderer.set_visible(layer_id, layer.visible)
@@ -412,7 +418,7 @@ class MainWindow(QMainWindow):
             self.viewport.render()
 
     def _on_targets_changed(self, target_min: float, target_max: float) -> None:
-        self._invalidate_calculation()
+        self._discard_stale_calculation()
         for layer in self.document.layer_manager.layers:
             self.layer_renderer.sync(layer, target_min, target_max, self._point_size)
         self.color_legend.update(
@@ -423,15 +429,25 @@ class MainWindow(QMainWindow):
         )
         self.viewport.render()
 
-    def _invalidate_calculation(self) -> None:
-        """Results depend on the targets; once they change the shown numbers
-        no longer match, so they must not reach a report."""
-        if self._calc_result is None:
+    def _calc_inputs(self) -> tuple:
+        """What a calculation result depends on: the targets and which
+        clouds (layers) are visible — Calculate uses the visible ones."""
+        visible_ids = tuple(layer.id for layer in self.document.layer_manager.visible_layers())
+        return (self.document.target_min, self.document.target_max, visible_ids)
+
+    def _discard_stale_calculation(self) -> None:
+        """Drop the shown results once their inputs changed, so numbers that
+        no longer match the targets/visible clouds can't reach a report.
+        Renaming or recoloring a layer doesn't change the inputs."""
+        if self._calc_result is None or self._calc_result_inputs == self._calc_inputs():
             return
         self._calc_result = None
         self._thickness_dist = None
+        self._calc_result_inputs = None
         self.results_dock.clear_result()
-        self.statusBar().showMessage("Target thickness changed — run Calculate again", 8000)
+        self.statusBar().showMessage(
+            "Target thickness or visible clouds changed — run Calculate again", 8000
+        )
 
     def _on_point_size_changed(self, size: int) -> None:
         self._point_size = size
@@ -754,6 +770,7 @@ class MainWindow(QMainWindow):
         self._calc_worker = CalculationWorker(
             points, distances, self.document.target_min, self.document.target_max, parent=self
         )
+        self._calc_worker_inputs = self._calc_inputs()
         self._calc_worker.finished_ok.connect(self._on_calc_done)
         self._calc_worker.failed.connect(self._on_calc_failed)
         self._calc_worker.start()
@@ -767,14 +784,16 @@ class MainWindow(QMainWindow):
 
     def _on_calc_done(self, calc, dist) -> None:
         self._end_calc_busy_state()
-        worker = self._calc_worker
-        if (worker.target_min, worker.target_max) != (self.document.target_min, self.document.target_max):
-            # Targets were edited while this ran — the result is already stale.
+        if self._calc_worker_inputs != self._calc_inputs():
+            # Targets/visible clouds were edited while this ran — already stale.
             self._export_after_calc = False
-            self.statusBar().showMessage("Target thickness changed during calculation — run Calculate again", 8000)
+            self.statusBar().showMessage(
+                "Target thickness or visible clouds changed during calculation — run Calculate again", 8000
+            )
             return
         self._calc_result = calc
         self._thickness_dist = dist
+        self._calc_result_inputs = self._calc_worker_inputs
         self.results_dock.show_result(calc, dist)
         self.statusBar().showMessage("Completed calculation")
         if self._export_after_calc:
@@ -803,13 +822,13 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage("Calculating… the report export will start when it finishes")
             return
         if self._calc_result is None:
-            # Never calculated, or the targets changed since — the report
-            # must not show numbers that don't match the current targets.
+            # Never calculated, or its inputs changed since — the report must
+            # not show numbers that don't match the current targets/clouds.
             answer = QMessageBox.question(
                 self, "Calculation required",
                 "The results are missing or out of date (the target thickness "
-                "changed).\n\nPress OK to calculate now — the report export "
-                "continues when the calculation finishes.",
+                "or the visible clouds changed).\n\nPress OK to calculate now — "
+                "the report export continues when the calculation finishes.",
                 QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel,
                 QMessageBox.StandardButton.Ok,
             )
