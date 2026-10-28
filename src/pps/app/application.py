@@ -97,6 +97,22 @@ def configure_logging(level: int = logging.INFO) -> str:
     return log_path
 
 
+# Identifies the app to the Windows shell. Without it the taskbar groups the
+# window under python.exe (when run from source) and shows that icon.
+WINDOWS_APP_USER_MODEL_ID = "JaconEquipment.PPSReport"
+
+
+def _set_windows_app_id() -> None:
+    if sys.platform != "win32":
+        return
+    import ctypes
+
+    try:
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(WINDOWS_APP_USER_MODEL_ID)
+    except (AttributeError, OSError):
+        pass  # very old Windows: cosmetic only
+
+
 def create_app(argv: list) -> QApplication:
     """Return the QApplication, creating it with Hi-DPI handling configured.
 
@@ -109,6 +125,7 @@ def create_app(argv: list) -> QApplication:
     if existing is not None:
         return existing
 
+    _set_windows_app_id()
     QGuiApplication.setHighDpiScaleFactorRoundingPolicy(
         Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
     )

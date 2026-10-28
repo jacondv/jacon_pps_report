@@ -1,9 +1,6 @@
-"""A small, self-contained "About" dialog — no external asset dependency
-(icon is drawn in code) so it works the same whether run from source or a
-packaged build."""
+"""A small "About" dialog: app logo, name, version and feature summary."""
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor, QFont, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -12,9 +9,11 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+from pps import __version__
+from pps.ui.icons import app_icon
+
 _APP_NAME = "Jacon PPS Report"
-_VERSION = "3.0"
-_ACCENT = "#2563eb"
+_LOGO_SIZE = 64
 
 _FEATURES = [
     "Load and visualize Point Cloud scan data (.ply)",
@@ -23,22 +22,6 @@ _FEATURES = [
     "Thickness statistics against a configurable Target Min/Max range",
     "PDF report export with a 3D snapshot and full data tables",
 ]
-
-
-def _make_logo(size: int = 56) -> QPixmap:
-    pixmap = QPixmap(size, size)
-    pixmap.fill(Qt.GlobalColor.transparent)
-    painter = QPainter(pixmap)
-    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-    painter.setPen(Qt.PenStyle.NoPen)
-    painter.setBrush(QColor(_ACCENT))
-    painter.drawRoundedRect(0, 0, size, size, size * 0.28, size * 0.28)
-    font = QFont("Segoe UI", int(size * 0.42), QFont.Weight.Bold)
-    painter.setFont(font)
-    painter.setPen(Qt.GlobalColor.white)
-    painter.drawText(pixmap.rect(), Qt.AlignmentFlag.AlignCenter, "J")
-    painter.end()
-    return pixmap
 
 
 class AboutDialog(QDialog):
@@ -54,7 +37,7 @@ class AboutDialog(QDialog):
         header = QHBoxLayout()
         header.setSpacing(14)
         logo = QLabel()
-        logo.setPixmap(_make_logo())
+        logo.setPixmap(app_icon().pixmap(_LOGO_SIZE, _LOGO_SIZE))
         header.addWidget(logo)
 
         title_box = QVBoxLayout()
@@ -65,7 +48,7 @@ class AboutDialog(QDialog):
         title_font.setBold(True)
         title.setFont(title_font)
         title.setWordWrap(True)
-        subtitle = QLabel(f"Version {_VERSION}")
+        subtitle = QLabel(f"Version {__version__}")
         subtitle.setStyleSheet("color: #8a94a6;")
         title_box.addWidget(title)
         title_box.addWidget(subtitle)

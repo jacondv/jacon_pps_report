@@ -17,13 +17,10 @@ if not getattr(sys, "frozen", False):
 
 from pps.app.application import configure_logging, create_app, use_persistent_matplotlib_cache  # noqa: E402
 from pps.app.settings import AppSettings  # noqa: E402
+from pps.ui.icons import app_icon  # noqa: E402
 from pps.ui.theme import apply_theme  # noqa: E402
 
 logger = logging.getLogger(__name__)
-
-APP_ICON = os.path.join(
-    getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__))), "assets", "icon.ico"
-)
 
 
 def _install_excepthook() -> None:
@@ -46,13 +43,13 @@ def _show_splash():
     QSplashScreen.show() blocked for ~1 s every launch (measured), while
     this shows in ~50 ms. Close it with .close() once the window is up."""
     from PySide6.QtCore import Qt
-    from PySide6.QtGui import QColor, QFont, QIcon, QPainter, QPixmap
+    from PySide6.QtGui import QColor, QFont, QPainter, QPixmap
     from PySide6.QtWidgets import QApplication, QLabel
 
     pixmap = QPixmap(440, 160)
     pixmap.fill(QColor("#1b1f27"))
     painter = QPainter(pixmap)
-    icon = QIcon(APP_ICON)
+    icon = app_icon()
     if not icon.isNull():
         icon.paint(painter, 24, 32, 96, 96)
     painter.setPen(QColor("#e6e9ef"))
@@ -91,6 +88,7 @@ def main() -> None:
 
     app = create_app(sys.argv)
     logger.info("QApplication created")
+    app.setWindowIcon(app_icon())  # title bar + taskbar of every window
     apply_theme(app, AppSettings().theme)
     splash = _show_splash()
     logger.info("Theme applied; loading the main window…")
