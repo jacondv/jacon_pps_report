@@ -6,6 +6,7 @@ exit criterion), and produce PDF numbers matching the golden baseline.
 
 import json
 import os
+import sys
 
 import pytest
 from PySide6.QtCore import Qt
@@ -133,7 +134,10 @@ def test_select_by_thickness_and_extract_segment(main_window, sample_ply_path):
     assert main_window.layer_renderer.get(segment.id) is None
 
 
-def test_export_pdf_produces_real_file(main_window, sample_ply_path, tmp_path, qtbot, monkeypatch):
+# "windowed": the shipped exe is built with console=False, where sys.stdout is
+# None — anything in the export path writing to it would fail the export.
+@pytest.mark.parametrize("windowed", [False, True], ids=["console", "windowed"])
+def test_export_pdf_produces_real_file(main_window, sample_ply_path, tmp_path, qtbot, monkeypatch, windowed):
     main_window._load_file(sample_ply_path)
     main_window._on_calculate()
     with qtbot.waitSignal(main_window._calc_worker.finished_ok, timeout=60000):
@@ -145,6 +149,14 @@ def test_export_pdf_produces_real_file(main_window, sample_ply_path, tmp_path, q
     )
     monkeypatch.setattr("pps.ui.main_window.QMessageBox.information", lambda *a, **k: None)
     monkeypatch.setattr("os.startfile", lambda *a, **k: None, raising=False)
+
+    def fail_on_error_dialog(_parent, _title, text, *a, **k):
+        raise AssertionError(text)
+
+    monkeypatch.setattr("pps.ui.main_window.QMessageBox.critical", fail_on_error_dialog)
+    if windowed:
+        monkeypatch.setattr(sys, "stdout", None)
+        monkeypatch.setattr(sys, "stderr", None)
 
     main_window._on_export_pdf()
 
