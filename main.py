@@ -15,7 +15,7 @@ import sys
 if not getattr(sys, "frozen", False):
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "src"))
 
-from pps.app.application import configure_logging, create_app  # noqa: E402
+from pps.app.application import configure_logging, create_app, use_persistent_matplotlib_cache  # noqa: E402
 from pps.app.settings import AppSettings  # noqa: E402
 from pps.ui.theme import apply_theme  # noqa: E402
 
@@ -69,6 +69,7 @@ def _show_splash():
 
 
 def main() -> None:
+    use_persistent_matplotlib_cache()
     log_path = configure_logging()
     _install_excepthook()
     logger.info("Starting Jacon PPS Report — log file: %s", log_path)
@@ -90,7 +91,18 @@ def main() -> None:
 
     start_background_preload(app)
 
-    sys.exit(app.exec())
+    exit_code = app.exec()
+    _dump_loaded_modules()
+    sys.exit(exit_code)
+
+
+def _dump_loaded_modules() -> None:
+    """Dev aid for trimming the build: with PPS_DUMP_MODULES=<file> set, write
+    every module the session imported (see docs/dep-slimming/PLAN.md Phase 4)."""
+    path = os.environ.get("PPS_DUMP_MODULES")
+    if path:
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("\n".join(sorted(sys.modules)) + "\n")
 
 
 if __name__ == "__main__":
