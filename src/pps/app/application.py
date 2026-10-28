@@ -97,13 +97,17 @@ def configure_logging(level: int = logging.INFO) -> str:
     return log_path
 
 
-# Identifies the app to the Windows shell. Without it the taskbar groups the
-# window under python.exe (when run from source) and shows that icon.
+# Identifies the app to the Windows shell when run from source; without it
+# the taskbar groups the window under python.exe and shows Python's icon.
 WINDOWS_APP_USER_MODEL_ID = "JaconEquipment.PPSReport"
 
 
 def _set_windows_app_id() -> None:
-    if sys.platform != "win32":
+    """Only for `python main.py`. The packaged exe must NOT set an explicit
+    ID: Windows would then take the taskbar icon from a shortcut carrying the
+    same ID and, finding none, show a generic icon. Left alone, the taskbar
+    uses the exe's own icon (the Jacon PPS logo)."""
+    if sys.platform != "win32" or getattr(sys, "frozen", False):
         return
     import ctypes
 

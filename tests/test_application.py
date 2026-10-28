@@ -30,3 +30,30 @@ def test_persistent_matplotlib_cache_only_in_frozen_app(monkeypatch, tmp_path):
     expected = os.path.join(str(tmp_path), "TunnelAnalyzer", "matplotlib")
     assert os.environ["MPLCONFIGDIR"] == expected
     assert os.path.isdir(expected)
+
+
+def test_windows_app_id_only_set_when_running_from_source(monkeypatch):
+    import ctypes
+    import sys
+
+    from pps.app import application
+
+    calls = []
+
+    class FakeShell32:
+        def SetCurrentProcessExplicitAppUserModelID(self, app_id):
+            calls.append(app_id)
+
+    class FakeWindll:
+        shell32 = FakeShell32()
+
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setattr(ctypes, "windll", FakeWindll(), raising=False)
+
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    application._set_windows_app_id()
+    assert calls == []  # the exe keeps its own icon on the taskbar
+
+    monkeypatch.delattr(sys, "frozen")
+    application._set_windows_app_id()
+    assert calls == [application.WINDOWS_APP_USER_MODEL_ID]
