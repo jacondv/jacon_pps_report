@@ -28,7 +28,6 @@ from pps.render.measurement_renderer import MeasurementRenderer
 from pps.render.note_renderer import NoteRenderer
 from pps.render.selection_renderer import SelectionRenderer
 from pps.render.viewport import Viewport
-from pps.report import PDFGenerator
 from pps.scene.document import Document
 from pps.scene.project_io import load_project, save_project
 from pps.tools.base import ToolContext
@@ -792,6 +791,10 @@ class MainWindow(QMainWindow):
                 "report_title": self.settings_store.report_title,
                 "report_logo_path": self.settings_store.report_logo_path or None,
             }
+
+            # Imported here, not at module level: jinja2/pdfkit aren't needed
+            # until the first export, so they shouldn't slow down startup.
+            from pps.report import PDFGenerator
 
             generator = PDFGenerator(filepath)
             out = generator.generate(ctx)
