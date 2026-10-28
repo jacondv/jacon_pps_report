@@ -1,5 +1,5 @@
-# Jacon PPS Report
-# Requirements for Python 3.9+
+# Jacon PPS Report — runtime requirements
+# Python 3.9+. Dev/test tools are in requirements-dev.txt.
 
 # GUI
 PySide6>=6.6.0
@@ -8,23 +8,16 @@ PySide6>=6.6.0
 pyvista>=0.43.0
 pyvistaqt>=0.11.0
 vtk>=9.0.0
+matplotlib>=3.5.0  # required by pyvista (imported on load); also the report chart
 
 # Point Cloud Processing
 plyfile>=1.0.0
 numpy>=1.21.0
-scipy>=1.7.0
-open3d>=0.17.0
+open3d>=0.17.0  # BPA surface area
 
 # PDF Report Generation
-reportlab>=4.0.0
-matplotlib>=3.5.0
 pdfkit>=1.0.0
 jinja2>=3.0.0
 
 # Utilities
 Pillow>=9.0.0
-
-# Dev / tests
-pytest>=7.0.0
-pytest-qt>=4.2.0
-markdown>=3.5.0  # docs/manual/build_manual.py only, not used at app runtime
