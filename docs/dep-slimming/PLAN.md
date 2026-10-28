@@ -249,7 +249,7 @@ Xuất PDF từ sample với cùng thông số như bản baseline → **mọi s
 | 2 | 2026-10-28 | — (chưa build) | | 62 | từ source: QApplication → splash 1.2 s (chi phí hiện cửa sổ Qt đầu tiên), → MainWindow shown 2.9 s | chờ đo | open3d preload 2.32 s ở nền | 136 passed, 69 s | jinja2/pdfkit không còn nạp lúc khởi động. matplotlib vẫn nạp (pyvista) |
 | 3 | — | | | | | | | | Huỷ — pyvista bắt buộc matplotlib |
 | 4 | 2026-10-28 | **705** | **2806** | 62 | **2.03** (đo tới lần vẽ đầu; run 1 ngay sau build: 11.67) | chờ đo | open3d preload 2.15 s ở nền | 138 passed, 74 s | Bỏ scipy, open3d/resources, VTK-m/viskores + ~50 module VTK. `check_bundle.py`: đủ 1835 module runtime. Sửa thêm: matplotlib dựng lại cache font **mỗi lần** chạy exe (PyInstaller rthook dùng thư mục tạm) → cache cố định; QSplashScreen chặn ~1 s → dùng QLabel; pdfkit `verbose=True` làm xuất PDF lỗi khi không có console → `verbose=False`. Mốc đo đổi sang "window painted" (sau lần vẽ đầu) — số baseline 3.29 s đo theo mốc cũ "MainWindow shown" (sớm hơn) |
-| 5 | | | | | | | | | |
+| 5 | 2026-10-28 | **722** | **1747** | 36 (venv-slim) | **1.87** (run 1 ngay sau build: 7.55) | chờ đo | open3d preload 1.42 s ở nền | 138 passed trên `.venv-slim` (golden pass với open3d 0.20) | Build từ `.venv-slim`: open3d 0.20, pyvista 0.49, vtk 9.7, PySide6 6.12, PyInstaller 6.22 → `requirements-build.lock`. Bỏ `jedi/third_party` (5 500 file .pyi). Bộ cài 159 MB (baseline 204 MB). Xem [REPORT.md](REPORT.md) |
 
 ---
 
