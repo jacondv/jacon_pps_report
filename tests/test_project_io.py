@@ -218,3 +218,32 @@ def test_area_measurement_from_older_project_loads_without_outline(sample_ply_pa
     area_m = next(m for m in loaded.measurements if isinstance(m, AreaMeasurement))
     assert area_m.outline == []
     assert area_m.area_m2 == 12.5
+
+
+def test_measurement_style_round_trips_and_defaults_for_older_projects(sample_ply_path, tmp_path, qtbot):
+    import json
+    import zipfile
+
+    doc = _build_document_with_content(sample_ply_path)
+    for m in doc.measurements:
+        m.color, m.font_size = "#123456", 20
+    project_path = str(tmp_path / "styled.ppsproj")
+    save_project(doc, project_path)
+
+    loaded = Document()
+    load_project(loaded, project_path, load_ply)
+    assert {(m.color, m.font_size) for m in loaded.measurements} == {("#123456", 20)}
+
+    # Projects saved before measurements had a font size get the default.
+    with zipfile.ZipFile(project_path) as zf:
+        project = json.loads(zf.read("project.json"))
+    for m in project["measurements"]:
+        del m["font_size"]
+    legacy_path = str(tmp_path / "legacy_style.ppsproj")
+    with zipfile.ZipFile(project_path) as src, zipfile.ZipFile(legacy_path, "w") as dst:
+        for item in src.infolist():
+            data = json.dumps(project) if item.filename == "project.json" else src.read(item.filename)
+            dst.writestr(item, data)
+    loaded = Document()
+    load_project(loaded, legacy_path, load_ply)
+    assert {m.font_size for m in loaded.measurements} == {14}

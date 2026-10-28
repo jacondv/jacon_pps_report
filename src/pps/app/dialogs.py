@@ -21,13 +21,45 @@ from PySide6.QtWidgets import (
 )
 
 
+FONT_SIZE_RANGE = (8, 48)
+
+
+class ColorButton(QPushButton):
+    """A swatch showing a color; clicking it opens a color picker."""
+
+    def __init__(self, color: str, dialog_title: str, parent=None):
+        super().__init__(parent)
+        self._dialog_title = dialog_title
+        self.setFixedSize(28, 22)
+        self.set_color(color)
+        self.clicked.connect(self._choose)
+
+    def color(self) -> str:
+        return self._color
+
+    def set_color(self, color: str) -> None:
+        self._color = color
+        self.setStyleSheet(f"background-color: {color}; border: 1px solid #555;")
+
+    def _choose(self) -> None:
+        chosen = QColorDialog.getColor(QColor(self._color), self, self._dialog_title)
+        if chosen.isValid():
+            self.set_color(chosen.name())
+
+
+def _font_size_spin(value: int) -> QSpinBox:
+    spin = QSpinBox()
+    spin.setRange(*FONT_SIZE_RANGE)
+    spin.setValue(value)
+    return spin
+
+
 class NoteEditorDialog(QDialog):
     def __init__(self, parent=None, text="", color="#ffd166", font_size=14):
         super().__init__(parent)
         self.setWindowTitle("Note")
         self.setModal(True)
         self.resize(380, 280)
-        self._color = color
 
         layout = QVBoxLayout(self)
 
@@ -38,15 +70,9 @@ class NoteEditorDialog(QDialog):
         layout.addWidget(self.text_edit)
 
         form = QFormLayout()
-        self.color_button = QPushButton()
-        self.color_button.setFixedSize(28, 22)
-        self._update_color_button()
-        self.color_button.clicked.connect(self._choose_color)
+        self.color_button = ColorButton(color, "Note color")
         form.addRow("Color:", self.color_button)
-
-        self.font_size_spin = QSpinBox()
-        self.font_size_spin.setRange(8, 48)
-        self.font_size_spin.setValue(font_size)
+        self.font_size_spin = _font_size_spin(font_size)
         form.addRow("Font size:", self.font_size_spin)
         layout.addLayout(form)
 
@@ -55,21 +81,38 @@ class NoteEditorDialog(QDialog):
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
 
-    def _update_color_button(self) -> None:
-        self.color_button.setStyleSheet(f"background-color: {self._color}; border: 1px solid #555;")
-
-    def _choose_color(self) -> None:
-        chosen = QColorDialog.getColor(QColor(self._color), self, "Note color")
-        if chosen.isValid():
-            self._color = chosen.name()
-            self._update_color_button()
-
     def values(self) -> dict:
         return {
             "text": self.text_edit.toPlainText().strip(),
-            "color": self._color,
+            "color": self.color_button.color(),
             "font_size": self.font_size_spin.value(),
         }
+
+
+class MeasurementStyleDialog(QDialog):
+    """Color (label + line/outline) and label font size of a distance or
+    area measurement."""
+
+    def __init__(self, parent=None, title="Measurement", color="#4cc9f0", font_size=14):
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.setModal(True)
+
+        layout = QVBoxLayout(self)
+        form = QFormLayout()
+        self.color_button = ColorButton(color, f"{title} color")
+        form.addRow("Color:", self.color_button)
+        self.font_size_spin = _font_size_spin(font_size)
+        form.addRow("Font size:", self.font_size_spin)
+        layout.addLayout(form)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def values(self) -> dict:
+        return {"color": self.color_button.color(), "font_size": self.font_size_spin.value()}
 
 
 def open_note_editor(existing=None, screen_pos=None, parent=None) -> Optional[dict]:
@@ -90,3 +133,18 @@ def open_note_editor(existing=None, screen_pos=None, parent=None) -> Optional[di
     if not values["text"]:
         return None
     return values
+
+
+def open_measurement_style_editor(measurement, parent=None) -> Optional[dict]:
+    """Edit a measurement's {color, font_size}. Returns only the fields that
+    changed, or None if cancelled or nothing changed."""
+    from pps.scene.measurements import DistanceMeasurement
+
+    title = "Distance" if isinstance(measurement, DistanceMeasurement) else "Area"
+    dialog = MeasurementStyleDialog(
+        parent, title=title, color=measurement.color, font_size=measurement.font_size
+    )
+    if dialog.exec() != QDialog.Accepted:
+        return None
+    changed = {k: v for k, v in dialog.values().items() if getattr(measurement, k) != v}
+    return changed or None

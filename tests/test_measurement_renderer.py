@@ -105,3 +105,19 @@ def test_area_without_outline_has_label_only():
     renderer.sync_one(measurement)
     assert measurement.id in renderer._labels
     assert measurement.id not in renderer._world_actors
+
+
+def test_labels_use_each_measurements_color_and_font_size():
+    renderer = make_renderer()
+    distance = DistanceMeasurement(p1=(0.0, 0.0, 0.0), p2=(1.0, 0.0, 0.0), color="#ff0000", font_size=22)
+    area = AreaMeasurement(
+        outline=[(0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (1.0, 1.0, 0.0)],
+        sources=[], centroid=(0.5, 0.5, 0.0), area_m2=1.0, color="#00ff00", font_size=9,
+    )
+    renderer.sync_all([distance, area])
+
+    for m, rgb in ((distance, (1.0, 0.0, 0.0)), (area, (0.0, 1.0, 0.0))):
+        label = renderer._labels[m.id]
+        assert label.font_size == m.font_size
+        assert label._text_actor.GetTextProperty().GetFontSize() == m.font_size
+        assert renderer._world_actors[m.id].GetProperty().GetColor() == rgb

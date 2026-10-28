@@ -317,6 +317,43 @@ def test_right_click_measurement_delete(document):
     assert document._find_measurement(m.id) is None
 
 
+
+def test_right_click_edit_restyles_measurement_with_undo(document):
+    m = AreaMeasurement(
+        outline=[(0.0, 0.0, 0.0), (10.0, 0.0, 0.0), (10.0, 10.0, 0.0)],
+        sources=[],
+        centroid=(100.0, 100.0, 0.0),
+        area_m2=5.0,
+    )
+    document.measurements.append(m)
+    edited = []
+
+    def fake_style_editor(measurement):
+        edited.append(measurement.id)
+        return {"color": "#ff0000", "font_size": 22}
+
+    tool = NavigateTool(object_menu=lambda kind, oid: "edit", measurement_editor=fake_style_editor)
+    tool.activate(make_ctx(document))
+
+    assert tool.handle_pointer(press(140, 140, button=MouseButton.RIGHT)) is True
+    assert edited == [m.id]
+    assert (m.color, m.font_size) == ("#ff0000", 22)
+
+    document.undo_stack.undo()
+    assert (m.color, m.font_size) == ("#4cc9f0", 14)
+
+
+def test_right_click_edit_measurement_cancelled_changes_nothing(document):
+    m = AreaMeasurement(outline=[], sources=[], centroid=(100.0, 100.0, 0.0), area_m2=5.0)
+    document.measurements.append(m)
+    tool = NavigateTool(object_menu=lambda kind, oid: "edit", measurement_editor=lambda measurement: None)
+    tool.activate(make_ctx(document))
+
+    tool.handle_pointer(press(140, 140, button=MouseButton.RIGHT))
+
+    assert (m.color, m.font_size) == ("#4cc9f0", 14)
+    assert document.undo_stack.count() == 0
+
 def test_external_select_preselects_for_the_next_drag(document):
     """Used by the Project dock's "Move" context action."""
     note = _add_screen_note(document, pos_frac=(0.5, 0.5))

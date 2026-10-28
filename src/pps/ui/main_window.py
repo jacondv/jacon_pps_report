@@ -16,6 +16,7 @@ from PySide6.QtWidgets import QApplication, QFileDialog, QMainWindow, QMessageBo
 
 
 from pps.app.settings import AppSettings
+from pps.app.dialogs import open_measurement_style_editor
 from pps.app.workers import AreaMeasureWorker, CalculationWorker
 from pps.core.filename_parser import parse_filename
 from pps.core.job_info import resolve_targets
@@ -139,7 +140,11 @@ class MainWindow(QMainWindow):
         self.measure_area_tool = MeasureAreaTool(area_requester=self._request_area_calculation)
         self.note_tool = NoteTool(note_editor=self._open_note_editor)
         self.annotation_tool = AnnotationTool(note_editor=self._open_note_editor)
-        self.navigate_tool = NavigateTool(note_editor=self._open_note_editor, object_menu=self._object_context_menu)
+        self.navigate_tool = NavigateTool(
+            note_editor=self._open_note_editor,
+            object_menu=self._object_context_menu,
+            measurement_editor=self._open_measurement_style_editor,
+        )
 
         self.tool_manager.register(self.navigate_tool)
         self.tool_manager.register(self.region_select_tool)
@@ -150,6 +155,9 @@ class MainWindow(QMainWindow):
 
     def _open_note_editor(self, existing, screen_pos):
         return open_inline_note_editor(self.viewport.interactor_widget, screen_pos, existing)
+
+    def _open_measurement_style_editor(self, measurement):
+        return open_measurement_style_editor(measurement, parent=self)
 
     def _move_object_preview(self, kind: str, object_id: str, offset_px=None, pos_frac=None) -> None:
         if kind == "note":
@@ -179,12 +187,12 @@ class MainWindow(QMainWindow):
 
         color = get_tokens(self.settings_store.theme)["text"]
         menu = QMenu(self)
-        act_edit = menu.addAction(load_icon("edit", color), "Edit…") if kind == "note" else None
+        act_edit = menu.addAction(load_icon("edit", color), "Edit…")
         menu.addSeparator()
         act_delete = menu.addAction(load_icon("delete", color), "Delete")
 
         chosen = menu.exec(QCursor.pos())
-        if act_edit is not None and chosen is act_edit:
+        if chosen is act_edit:
             return "edit"
         if chosen is act_delete:
             return "delete"

@@ -25,4 +25,4 @@ style: flush
 | --- | --- |
 | Segment (layer) | Rename…, Delete layer (not available for the original cloud) |
 | Note / Annotation | Edit…, Move, Hide/Show, Delete |
-| Distance / Area measurement | Hide/Show, Delete |
+| Distance / Area measurement | Edit… (color and font size), Hide/Show, Delete — double-click also opens Edit… |

@@ -102,6 +102,7 @@ class MeasurementRenderer:
             text=f"{measurement.distance_m:.3f} m",
             offset_px=measurement.label_offset_px,
             color=measurement.color,
+            font_size=measurement.font_size,
             marker_radius=0.0,  # the line itself marks the segment; no extra sphere
         )
         label.set_visible(visible)
@@ -124,6 +125,7 @@ class MeasurementRenderer:
             text=text,
             offset_px=measurement.label_offset_px,
             color=measurement.color,
+            font_size=measurement.font_size,
         )
         label.set_visible(visible)
         self._labels[measurement.id] = label
