@@ -17,13 +17,19 @@ from pps.ui.main_window import MainWindow
 
 @pytest.fixture
 def main_window(qtbot):
-    window = MainWindow()
-    qtbot.addWidget(window)
-    yield window
     # Bypass the unsaved-changes confirmation dialog on teardown — that flow
     # has its own dedicated tests below and must not block here on a real
-    # (non-mocked) QMessageBox if a test left the document dirty.
-    window.document._dirty = False
+    # (non-mocked) QMessageBox if a test left the document dirty. pytest-qt
+    # closes registered widgets in its own teardown hook, before this
+    # fixture's code after `yield` runs, so the reset has to happen in
+    # before_close_func.
+    def _discard_changes(w):
+        w.document._dirty = False
+
+    window = MainWindow()
+    qtbot.addWidget(window, before_close_func=_discard_changes)
+    yield window
+    _discard_changes(window)
     window.close()
 
 
