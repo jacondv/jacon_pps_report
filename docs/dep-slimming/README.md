@@ -20,7 +20,7 @@ Tài liệu điều hướng cho agent code. Đọc hết file này trước, r�
 | `vtk.libs` + `vtkmodules` | 313 | Viewer 3D (pyvista / pyvistaqt / vtk) | **Giữ**, chỉ lọc module (Phase 5) |
 | `open3d` | 183 | Chỉ BPA surface area: `core/surface_area.py`, `core/calculator.py` (`_to_open3d_pointcloud`), `core/analysis.py` (`compute_area_m2`) | **Bỏ** (Phase 3) |
 | `dash` + `plotly` + `jedi` | 48 | Không dùng — open3d kéo theo | Tự mất khi bỏ open3d; thêm vào `excludes` |
-| `scipy` + `scipy.libs` | 78 | **Không có import nào** — chỉ nằm trong `hiddenimports` của `build.spec` | **Bỏ** (Phase 1). Ngoại lệ: Phase 3 có thể dùng `scipy.spatial` nếu chọn phương án B |
+| `scipy` + `scipy.libs` | 78 | **Không có import nào** — chỉ nằm trong `hiddenimports` của `build.spec` | **Bỏ** (Phase 1) |
 | `report/` (wkhtmltopdf ~40 MB + assets) | 80 | `report/core/html_pdf_generator.py` | **Giữ** trong đợt này (xem §5 "Ngoài phạm vi") |
 | `matplotlib` | 12 | `render/picking.py` (`Path.contains_points`), `report/core/html_pdf_generator.py` (1 biểu đồ cột) | **Bỏ** (Phase 2) |
 | `PIL` | 13 | Pyvista cần (screenshot) | Giữ |
@@ -38,8 +38,9 @@ vtk 9.6.1, numpy 2.2.6, open3d 0.19.0, scipy 1.15.3, matplotlib 3.10.8, PyInstal
    đo khoảng cách, đo diện tích, ghi chú, layer, undo/redo, lưu/mở `.ppsproj`,
    xuất PDF, User Guide. Toàn bộ `pytest` xanh.
 2. **Số liệu không đổi**, trừ diện tích/thể tích ở Phase 3 (xem §3 quy tắc 4).
-3. **Gỡ khỏi bản build**: `open3d`, `scipy` (trừ khi Phase 3 chọn phương án B), `matplotlib`,
-   `reportlab`, `dash`, `plotly`, `jedi`.
+3. **Gỡ khỏi bản build**: `open3d`, `scipy`, `matplotlib`, `reportlab`, `dash`, `plotly`, `jedi`.
+   **Không thêm gói mới.** Mọi công cụ và thư viện phải miễn phí cho dùng thương mại/nội bộ
+   (công ty không có license Visual Studio → không dùng MSVC, không viết extension C/C++).
 4. **Mục tiêu đo được** (ghi số vào [PLAN.md §Nhật ký đo](PLAN.md#nhật-ký-đo)):
    - Dung lượng `dist/` ≤ **450 MB** sau Phase 1–4, cố gắng ≤ **350 MB** sau Phase 5.
    - Số file trong `dist/` giảm ≥ 40 %.

@@ -47,7 +47,6 @@ và ghi một dòng vào [Nhật ký đo](#nhật-ký-đo) ở cuối file.
    - Xoá `"scipy"`, `"reportlab"` khỏi `hiddenimports`.
    - Thêm `excludes=["PyQt5", "PyQt6", "tkinter", "IPython", "jedi", "dash", "plotly",
      "notebook", "ipywidgets", "scipy", "reportlab", "pytest"]`.
-     (Nếu Phase 3 chọn phương án B dùng `scipy.spatial`, bỏ `"scipy"` khỏi `excludes` lúc đó.)
    - Đổi `console=True` → `console=False` (log đã ghi ra file; `_install_excepthook` vẫn log
      exception). Kiểm tra lại: lỗi khởi động vẫn hiện được ra người dùng không — nếu
      `main()` lỗi trước khi có cửa sổ, thêm `QMessageBox.critical` trong excepthook **chỉ khi**
@@ -122,62 +121,78 @@ và ghi một dòng vào [Nhật ký đo](#nhật-ký-đo) ở cuối file.
   dày (`area_reached_target_m2`, chỉ khi ≥ 100 điểm); thể tích = diện tích đạt × chiều dày TB.
 - `core/analysis.py::compute_area_m2` — tool Measure Area (vùng chọn nhỏ).
 
-### 3.2 Thiết kế thay thế
-- Viết lại `surface_area(points: np.ndarray, radii=(0.05, 0.1)) -> float` nhận **numpy array**
-  (không còn kiểu PointCloud). Xoá `_to_open3d_pointcloud`, sửa các chỗ gọi.
-- Giữ nguyên bước 1 (voxel centroid, numpy: `np.floor(p / v)` → `np.unique(..., return_inverse)`
-  → `np.bincount` trung bình) và bước 2 (đếm láng giềng trong bán kính).
-- Bước 3–4 thay bằng **một trong hai phương án**, agent làm **cả hai bản thử** rồi so sánh:
+### 3.2 Phương án đã chốt (2026-10-28): Delaunay 2D của VTK theo khối 1 m
 
-| | Phương án A — numpy thuần (ưu tiên) | Phương án B — `scipy.spatial` |
-|---|---|---|
-| Láng giềng (bước 2) | Băm lưới cell = bán kính, xét 27 cell lân cận | `cKDTree.query_ball_point` |
-| Diện tích | Chia cloud thành ô lớn (~0.5–1 m). Mỗi ô: PCA → mặt phẳng tiếp tuyến, chiếu điểm lên, đếm số ô vuông cạnh `s = min(radii)` có điểm → diện tích = số ô × s². Cộng tất cả. | Như A, hoặc triangulation Delaunay 2D cục bộ trên mặt phẳng tiếp tuyến, bỏ tam giác có cạnh > `max(radii)` (mô phỏng giới hạn bóng của BPA), cộng diện tích tam giác |
-| Gói thêm | Không | `scipy` (chỉ dùng `scipy.spatial`, ~25 MB sau khi exclude submodule khác) |
+Đã thử và loại (chi tiết ở [AREA_COMPARISON.md](AREA_COMPARISON.md)):
+- BPA viết lại bằng Python+numpy: 67 s (chậm ~5×), chia khối + multiprocessing vẫn 20–37 s.
+- Port BPA sang C++: cần MSVC — **loại vì công ty không có license Visual Studio**. Yêu cầu:
+  toàn bộ toolchain và thư viện phải miễn phí cho dùng thương mại/nội bộ.
+- Đếm ô lưới chiếu: lệch −35 % … −2 %. Delaunay trên 1 mặt phẳng chung: −53 % (vòm hầm gập).
+- Delaunay có hiệu chỉnh normal: −8 % trên dữ liệu thật.
 
-  (Có thể thử thêm `pyvista.PolyData.reconstruct_surface()` của VTK vì VTK đã có sẵn, nhưng nó
-  có xu hướng bít lỗ hổng → thường cho diện tích lớn hơn BPA trên bề mặt hầm có khoảng trống.)
+Thuật toán chốt (bản tham chiếu đã chạy thử: [reference_area.py](reference_area.py)):
+1. **Giảm mẫu voxel** cạnh `min(radii)/2` = 0.025 m, lấy trọng tâm mỗi voxel (numpy).
+2. **Lọc nhiễu**: giữ điểm có ≥ 8 láng giềng (tính cả chính nó) trong bán kính `2*min(radii)`
+   = 0.1 m. Láng giềng tìm bằng băm lưới cell = bán kính, xét 27 cell lân cận (numpy).
+3. **Chia khối 1×1×1 m**, mỗi khối mở rộng thêm lề 0.25 m.
+4. Mỗi khối: PCA → mặt phẳng khớp nhất → chiếu điểm thành (u, v) →
+   `pyvista.PolyData(...).delaunay_2d()` chỉ để lấy cách nối tam giác.
+5. Với từng tam giác, dùng **toạ độ 3D gốc**: bỏ tam giác có bán kính đường tròn ngoại tiếp 3D
+   > `R_MAX = 0.07` m hoặc suy biến; chỉ giữ tam giác có **trọng tâm nằm trong lõi khối**
+   (không tính lề) → không mất/không trùng tam giác ở biên khối.
+6. Diện tích = tổng diện tích 3D các tam giác giữ lại.
 
-### 3.3 Script so sánh (bắt buộc trước khi chọn)
-`tools/compare_area.py` (dev-only, yêu cầu open3d — thêm `open3d` vào `requirements-dev.txt`
-với chú thích "chỉ để so sánh, không dùng lúc chạy"). Giữ bản open3d cũ trong script này
-để tham chiếu. In bảng:
+Hằng số (`BLOCK_SIZE_M = 1.0`, `BLOCK_MARGIN_M = 0.25`, `R_MAX_M = 0.07`) đặt ở đầu
+`core/surface_area.py`, có docstring giải thích lý do chọn và tham chiếu tới AREA_COMPARISON.md.
 
-| Bộ dữ liệu | open3d BPA | A | B | ΔA % | ΔB % | thời gian |
-|---|---|---|---|---|---|---|
-| sample — toàn bộ | | | | | | |
-| sample — điểm đạt target (case 0 và case 1 của golden) | | | | | | |
-| sample — 5 vùng con ngẫu nhiên 1–5 m² (mô phỏng Measure Area) | | | | | | |
-| mặt phẳng 2×3 m (giá trị đúng 6.000), có nhiễu σ=3 mm | | | | | | |
-| nửa trụ R=3 m, dài 2 m (đúng π·3·2 = 18.850), nhiễu σ=3 mm | | | | | | |
-| mặt phẳng có lỗ tròn R=0.5 m (đúng 6 − π·0.25) | | | | | | |
+Chữ ký mới: `surface_area(points: np.ndarray, radii=(0.05, 0.1)) -> float` — nhận numpy
+array, không còn kiểu PointCloud. Xoá `_to_open3d_pointcloud`, sửa các chỗ gọi.
+Chỉ dùng numpy + pyvista/VTK (đã có sẵn) — **không thêm gói nào, không dùng scipy**.
 
-**Tiêu chí chọn:**
-- Dữ liệu tổng hợp: lệch so với **giá trị đúng** ≤ 2 %.
-- Sample: lệch so với open3d ≤ 2 % (tổng diện tích và diện tích đạt target).
-- Thời gian ≤ open3d trên sample.
-- Bằng nhau → chọn A (không thêm gói).
+### 3.3 Kiểm chứng trước khi áp dụng
+`tools/compare_area.py` (dev-only; cần open3d → `requirements-compare.txt`, ghi chú "chỉ để so
+sánh, không dùng lúc chạy"). Giữ bản open3d cũ trong script này làm tham chiếu. Script chạy
+trên **mọi file `.ply` trong một thư mục truyền vào** (chủ dự án sẽ cung cấp thêm file thật:
+hầm thẳng, đoạn cong, vách/góc) và in bảng: toàn bộ cloud + tập đạt target > 20/40/50/100 mm
+(sau khi clip |d|<12 và |d|>500 như `calculate_area_and_volume`) + 5 vùng con 1–5 m².
+
+Kết quả đã đo trên sample (đích cần tái lập, R = 0.07, khối 1 m):
+
+| Tập điểm | open3d BPA | Delaunay VTK | Lệch |
+|---|---|---|---|
+| Toàn bộ cloud | 99.748 | 98.727 | −1.0 % |
+| Đạt target > 20 mm | 16.588 | 16.771 | +1.1 % |
+| > 40 mm (golden case 0) | 14.154 | 14.344 | +1.3 % |
+| > 50 mm (golden case 1) | 13.775 | 13.925 | +1.1 % |
+| > 100 mm | 11.727 | 11.918 | +1.6 % |
+| Thời gian toàn bộ cloud | 11.5 s | ~4.5 s (gồm tiền xử lý) | |
+
+**Tiêu chí chấp nhận:** trên mọi file được cung cấp, lệch so với open3d ≤ ±3 % cho toàn bộ
+cloud và các tập đạt target; nhanh hơn open3d. File nào vượt ngưỡng → ghi lại, **không tự
+chỉnh `R_MAX`/kích thước khối để khớp** — báo cáo cho chủ dự án.
 
 ### 3.4 Điểm dừng — chờ chủ dự án duyệt
-Ghi bảng kết quả vào `docs/dep-slimming/AREA_COMPARISON.md`, kèm đề xuất phương án. **Dừng lại,
-báo cáo, chờ duyệt.** Chưa sửa golden, chưa gỡ open3d.
+Ghi bảng kết quả trên các file thật vào `AREA_COMPARISON.md` (mục "Kiểm chứng trên dữ liệu
+thật"). **Dừng lại, báo cáo, chờ duyệt.** Chưa sửa golden, chưa gỡ open3d.
 
 ### 3.5 Sau khi được duyệt
-1. Áp dụng phương án được chọn vào `core/surface_area.py`; cập nhật `calculator.py`,
+1. Áp dụng thuật toán 3.2 vào `core/surface_area.py`; cập nhật `calculator.py`,
    `analysis.py` (bỏ `import open3d`). Giữ nguyên: ngưỡng 100 điểm, công thức thể tích,
    in-place mutation của `distances`, `AREA_MEASUREMENT_RADII`.
 2. Golden: viết `tests/golden/update_area_fields.py` chỉ cập nhật 3 trường `surface_area_m2`,
    `volume_m3`, `area_reached_target_m2` trong `sample_baseline.json`; mọi trường khác phải
    giữ nguyên (script tự assert điều này). Ghi chú lý do + ngày + người duyệt ở đầu
    `test_calculator_golden.py`.
-3. Test mới `tests/test_surface_area.py`: các ca tổng hợp ở bảng 3.3 với giá trị đúng (±2 %),
-   cloud rỗng → 0, cloud toàn outlier → 0, deterministic (chạy 2 lần cùng kết quả).
+3. Test mới `tests/test_surface_area.py`: nửa trụ R = 3 m dài 2 m (đúng 18.850 m², nhiễu
+   σ = 3 mm, chấp nhận ±3 %); mặt phẳng 2×3 m có lỗ tròn R = 0.5 m (đúng 5.215 m², ±6 % — đo được +5.1 % — Delaunay
+   đếm cả độ gồ ghề của nhiễu); cloud rỗng → 0; cloud toàn outlier → 0; một khối duy nhất;
+   cloud trải qua nhiều khối cho cùng kết quả khi dịch gốc toạ độ ±0.3 m (±1 %); deterministic.
 4. Xoá `open3d` khỏi `requirements.txt`, `build.spec` (`collect_data_files("open3d")`,
    `collect_submodules("open3d")`, `"open3d"` trong `hiddenimports`); thêm `"open3d"` vào
    `excludes`. Nếu Phase 1 đã tạm bỏ `dash`/`plotly` khỏi `excludes`, thêm lại.
 5. `grep -rn open3d src build.spec requirements.txt` → rỗng.
 
-**Commits:** `Add area comparison script`, `Replace open3d BPA surface area with <A|B>`,
+**Commits:** `Add area comparison script`, `Replace open3d BPA surface area with block-wise VTK Delaunay`,
 `Update golden area fields after approved algorithm change`, `Remove open3d dependency`
 
 ---
