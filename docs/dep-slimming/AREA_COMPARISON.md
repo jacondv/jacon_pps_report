@@ -7,9 +7,12 @@ Tập "đạt target > X mm": điểm có `d > X` sau khi clip |d|<12 và |d|>50
 `calculate_area_and_volume`. Giá trị open3d cho > 40 và > 50 mm trùng golden baseline.
 
 ## Kết luận
-Chọn **Delaunay 2D của VTK theo khối 1 m, R_MAX = 0.07 m** ([reference_area.py](reference_area.py)):
-lệch −1.0 % … +1.6 % so với open3d, nhanh ~2.6×, không thêm gói nào, toàn bộ miễn phí.
-Cần kiểm chứng thêm trên file PLY thật khác trước khi áp dụng (PLAN.md Phase 3.3).
+**Đợt này giữ open3d** (quyết định 2026-10-28 — số liệu báo cáo phải giữ nguyên). Tài liệu này
+chỉ phục vụ phương án dự phòng ở PLAN.md Phụ lục.
+
+Nếu bỏ open3d, phương án tốt nhất là **Delaunay 2D của VTK theo khối 1 m, R_MAX = 0.07 m**
+([reference_area.py](reference_area.py)): lệch −1.0 % … +1.6 % so với open3d, nhanh ~2.6×, không
+thêm gói nào, toàn bộ miễn phí. Phải kiểm chứng trên file PLY thật khác trước khi áp dụng.
 
 ## 1. Thời gian từng bước của open3d (toàn bộ cloud)
 
