@@ -448,3 +448,30 @@ def test_opening_project_applies_its_point_size(main_window, sample_ply_path, tm
     assert other.document.dirty is False
     assert other.settings_store.point_size == 6  # becomes the remembered size
     assert other.document.point_size is None  # consumed
+
+
+def test_changing_visible_clouds_invalidates_calculation(main_window, sample_ply_path, qtbot):
+    main_window._load_file(sample_ply_path)
+    dock = main_window.selection_dock
+    dock.spin_from.setValue(75)
+    dock.spin_to.setValue(125)
+    dock._on_filter_clicked()
+    dock._on_extract_segment()  # shows only the new segment
+    _calculate(main_window, qtbot)
+    assert main_window._calc_result is not None
+
+    original = main_window.document.layer_manager.original
+    main_window.document.set_layer_visible(original.id, True)
+
+    assert main_window._calc_result is None
+    assert main_window.results_dock.lbl_area.text() == "-"
+
+
+def test_renaming_a_layer_keeps_the_calculation(main_window, sample_ply_path, qtbot):
+    main_window._load_file(sample_ply_path)
+    _calculate(main_window, qtbot)
+    original = main_window.document.layer_manager.original
+
+    main_window.document._rename_layer(original.id, "Renamed")  # emits layer_changed
+
+    assert main_window._calc_result is not None

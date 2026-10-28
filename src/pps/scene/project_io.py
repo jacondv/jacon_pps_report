@@ -131,9 +131,10 @@ def _measurement_from_dict(data: dict):
             for s in data["sources"]
         ]
         data["centroid"] = _tuple(data["centroid"], 3)
-        data["boundary_px_at_creation"] = [
-            _tuple(p, 2) for p in data["boundary_px_at_creation"]
-        ]
+        # Older projects stored a screen-pixel outline that can't be mapped
+        # back onto the cloud; those measurements load without an outline.
+        data.pop("boundary_px_at_creation", None)
+        data["outline"] = [_tuple(p, 3) for p in data.get("outline", [])]
         return AreaMeasurement(**data)
 
     data["p1"] = _tuple(data["p1"], 3)

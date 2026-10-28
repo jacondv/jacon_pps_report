@@ -43,7 +43,7 @@ def _build_document_with_content(sample_ply_path):
     )
     doc.measurements.append(
         AreaMeasurement(
-            boundary_px_at_creation=[(0.0, 0.0), (10.0, 0.0), (10.0, 10.0)],
+            outline=[(0.0, 0.0, 0.0), (10.0, 0.0, 0.5), (10.0, 10.0, 1.0)],
             sources=[SourceRef(layer_id=original.id, indices=indices)],
             centroid=(1.0, 1.0, 0.0),
             area_m2=12.5,
@@ -92,6 +92,7 @@ def test_save_and_load_project_round_trip(sample_ply_path, tmp_path, qtbot):
     area_m = next(m for m in loaded.measurements if isinstance(m, AreaMeasurement))
     assert distance_m.distance_m == 5.0
     assert area_m.area_m2 == 12.5
+    assert area_m.outline == [(0.0, 0.0, 0.0), (10.0, 0.0, 0.5), (10.0, 10.0, 1.0)]
     assert area_m.sources[0].layer_id == original.id
     np.testing.assert_array_equal(area_m.sources[0].indices, np.array([0, 1, 2, 3, 4]))
 
@@ -187,3 +188,33 @@ def test_point_size_round_trips_and_is_optional(sample_ply_path, tmp_path, qtbot
     loaded = Document()
     load_project(loaded, without_size, load_ply)
     assert loaded.point_size is None
+
+
+def test_area_measurement_from_older_project_loads_without_outline(sample_ply_path, tmp_path, qtbot):
+    """Projects saved before outlines were 3D stored a screen-pixel
+    `boundary_px_at_creation` instead; they must still open."""
+    import json
+    import zipfile
+
+    doc = _build_document_with_content(sample_ply_path)
+    project_path = str(tmp_path / "old_area.ppsproj")
+    save_project(doc, project_path)
+
+    legacy_path = str(tmp_path / "legacy_area.ppsproj")
+    with zipfile.ZipFile(project_path) as src, zipfile.ZipFile(legacy_path, "w") as dst:
+        for item in src.infolist():
+            data = src.read(item.filename)
+            if item.filename == "project.json":
+                project = json.loads(data)
+                for m in project["measurements"]:
+                    if m["kind"] == "area":
+                        del m["outline"]
+                        m["boundary_px_at_creation"] = [[0.0, 0.0], [10.0, 0.0], [10.0, 10.0]]
+                data = json.dumps(project).encode("utf-8")
+            dst.writestr(item, data)
+
+    loaded = Document()
+    load_project(loaded, legacy_path, load_ply)
+    area_m = next(m for m in loaded.measurements if isinstance(m, AreaMeasurement))
+    assert area_m.outline == []
+    assert area_m.area_m2 == 12.5

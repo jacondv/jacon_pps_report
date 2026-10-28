@@ -8,14 +8,20 @@ keeping this a pure "data -> actors" mapper like LayerRenderer.
 from typing import Dict, Iterable, Tuple, Union
 
 import numpy as np
+from vtkmodules.vtkCommonCore import vtkPoints
+from vtkmodules.vtkCommonDataModel import vtkCellArray, vtkPolyData
 from vtkmodules.vtkFiltersSources import vtkLineSource
-from vtkmodules.vtkRenderingCore import vtkActor, vtkActor2D, vtkPolyDataMapper
+from vtkmodules.vtkRenderingCore import vtkActor, vtkPolyDataMapper
 
-from pps.render.actors2d import polyline_actor
 from pps.render.labels import AnchoredLabel, hex_to_rgb, layer_visible as _layer_visible
 from pps.scene.measurements import AreaMeasurement, DistanceMeasurement
 
 Measurement = Union[DistanceMeasurement, AreaMeasurement]
+
+# Depth-buffer units an area outline is pulled toward the camera; enough to
+# win against cloud points at the same depth, too little to show through the
+# cloud when viewed from behind.
+OUTLINE_DEPTH_OFFSET_UNITS = -2000.0
 
 
 class MeasurementRenderer:
@@ -23,8 +29,8 @@ class MeasurementRenderer:
         self._plotter = plotter
         self._overlay = overlay
         self._labels: Dict[str, AnchoredLabel] = {}
-        self._line_actors: Dict[str, vtkActor] = {}
-        self._boundary_actors: Dict[str, vtkActor2D] = {}
+        # Geometry in the 3D scene: a distance's line or an area's outline.
+        self._world_actors: Dict[str, vtkActor] = {}
 
     def sync_all(self, measurements: Iterable[Measurement], layer_manager=None) -> None:
         measurements = list(measurements)
@@ -47,22 +53,15 @@ class MeasurementRenderer:
         if label is not None:
             label.remove()
 
-        line_actor = self._line_actors.pop(measurement_id, None)
-        if line_actor is not None:
+        actor = self._world_actors.pop(measurement_id, None)
+        if actor is not None:
             try:
-                self._plotter.renderer.RemoveActor(line_actor)
-            except Exception:
-                pass
-
-        boundary_actor = self._boundary_actors.pop(measurement_id, None)
-        if boundary_actor is not None:
-            try:
-                self._overlay.renderer.RemoveActor(boundary_actor)
+                self._plotter.renderer.RemoveActor(actor)
             except Exception:
                 pass
 
     def clear(self) -> None:
-        for measurement_id in list(self._labels) + list(self._line_actors) + list(self._boundary_actors):
+        for measurement_id in set(self._labels) | set(self._world_actors):
             self.remove(measurement_id)
 
     def set_highlighted(self, measurement_id) -> None:
@@ -93,7 +92,7 @@ class MeasurementRenderer:
         actor.GetProperty().SetLineWidth(2.0)
         actor.SetVisibility(visible)
         self._plotter.renderer.AddActor(actor)
-        self._line_actors[measurement.id] = actor
+        self._world_actors[measurement.id] = actor
 
         midpoint = _midpoint(measurement.p1, measurement.p2)
         label = AnchoredLabel(
@@ -111,21 +110,11 @@ class MeasurementRenderer:
     # ------------------------------------------------------------------ area
     def _sync_area(self, measurement: AreaMeasurement, layer_visible: bool) -> None:
         visible = measurement.visible and layer_visible
-        # boundary_px_at_creation is a snapshot of screen pixels at the
-        # moment the region was drawn — it does NOT track the camera
-        # afterward (that would need re-projecting the original 3D
-        # boundary, which we don't keep). Shown as a best-effort outline.
-        if len(measurement.boundary_px_at_creation) >= 3:
-            actor = polyline_actor(
-                measurement.boundary_px_at_creation,
-                closed=True,
-                rgb=hex_to_rgb(measurement.color),
-                line_width=2.0,
-                opacity=0.7,
-            )
+        if len(measurement.outline) >= 3:
+            actor = _outline_actor(measurement.outline, measurement.color)
             actor.SetVisibility(visible)
-            self._overlay.renderer.AddActor(actor)
-            self._boundary_actors[measurement.id] = actor
+            self._plotter.renderer.AddActor(actor)
+            self._world_actors[measurement.id] = actor
 
         text = "…" if measurement.area_m2 is None else f"{measurement.area_m2:.2f} m²"
         label = AnchoredLabel(
@@ -138,6 +127,35 @@ class MeasurementRenderer:
         )
         label.set_visible(visible)
         self._labels[measurement.id] = label
+
+
+def _outline_actor(outline, color: str) -> vtkActor:
+    """Closed polyline through the outline's cloud points. It lies exactly
+    on the surface, so it is drawn as thick tubes and pulled slightly toward
+    the camera to stay visible over the (equally deep) rendered points."""
+    points = vtkPoints()
+    for p in outline:
+        points.InsertNextPoint(*p)
+    ring = vtkCellArray()
+    ring.InsertNextCell(len(outline) + 1)
+    for i in list(range(len(outline))) + [0]:
+        ring.InsertCellPoint(i)
+    poly = vtkPolyData()
+    poly.SetPoints(points)
+    poly.SetLines(ring)
+
+    mapper = vtkPolyDataMapper()
+    mapper.SetInputData(poly)
+    mapper.SetResolveCoincidentTopologyToPolygonOffset()
+    mapper.SetRelativeCoincidentTopologyLineOffsetParameters(0.0, OUTLINE_DEPTH_OFFSET_UNITS)
+
+    actor = vtkActor()
+    actor.SetMapper(mapper)
+    prop = actor.GetProperty()
+    prop.SetColor(*hex_to_rgb(color))
+    prop.SetLineWidth(3.0)
+    prop.SetRenderLinesAsTubes(True)
+    return actor
 
 
 def _midpoint(p1: Tuple[float, float, float], p2: Tuple[float, float, float]) -> Tuple[float, float, float]:

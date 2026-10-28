@@ -302,7 +302,7 @@ def test_right_click_on_empty_space_does_not_consume(document):
 
 def test_right_click_measurement_delete(document):
     m = AreaMeasurement(
-        boundary_px_at_creation=[(0.0, 0.0), (10.0, 0.0), (10.0, 10.0)],
+        outline=[(0.0, 0.0, 0.0), (10.0, 0.0, 0.0), (10.0, 10.0, 0.0)],
         sources=[],
         centroid=(100.0, 100.0, 0.0),
         area_m2=5.0,

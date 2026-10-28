@@ -19,6 +19,16 @@ def project_to_screen(points: np.ndarray, plotter) -> Optional[np.ndarray]:
     VTK/camera error (e.g. degenerate view) instead of raising, matching
     the old code's tolerance for a bad frame.
     """
+    projected = project_to_screen_with_depth(points, plotter)
+    return None if projected is None else projected[0]
+
+
+def project_to_screen_with_depth(
+    points: np.ndarray, plotter
+) -> Optional[Tuple[np.ndarray, np.ndarray]]:
+    """Like project_to_screen, plus each point's distance in front of the
+    camera along the view direction (smaller = nearer; <= 0 = behind the
+    camera). Works for both perspective and parallel projection."""
     try:
         renderer = plotter.renderer
         camera = renderer.GetActiveCamera()
@@ -37,7 +47,8 @@ def project_to_screen(points: np.ndarray, plotter) -> Optional[np.ndarray]:
         homogeneous = np.ones((n, 4), dtype=np.float64)
         homogeneous[:, :3] = points
 
-        clip = homogeneous @ view.T @ proj.T
+        eye = homogeneous @ view.T  # camera looks down -z in eye space
+        clip = eye @ proj.T
         w = clip[:, 3:4]
         w = np.where(np.abs(w) < 1e-10, 1e-10, w)
         ndc = clip[:, :2] / w
@@ -46,9 +57,68 @@ def project_to_screen(points: np.ndarray, plotter) -> Optional[np.ndarray]:
         sx = (ndc[:, 0] + 1.0) * 0.5 * width
         sy = (ndc[:, 1] + 1.0) * 0.5 * height
 
-        return np.column_stack([sx, sy])
+        return np.column_stack([sx, sy]), -eye[:, 2]
     except Exception:
         return None
+
+
+def drape_on_surface(
+    screen_points: List[Tuple[float, float]], points: np.ndarray, plotter, radius_px: float = 6.0
+) -> List[Tuple[float, float, float]]:
+    """Map screen positions onto the visible cloud surface.
+
+    For each screen position, returns the cloud point nearest the camera
+    among those projecting within `radius_px` of it — i.e. the point the
+    user sees there, never one hidden behind it. Positions with no cloud
+    point nearby (drawn off the cloud) are dropped, so the result can be
+    shorter than the input. Vectorized over the whole cloud instead of one
+    vtkPointPicker ray cast per position, which is too slow for an outline
+    of a few hundred samples.
+    """
+    if len(points) == 0 or not screen_points:
+        return []
+    projected = project_to_screen_with_depth(points, plotter)
+    if projected is None:
+        return []
+    xy, depth = projected
+    in_front = depth > 0
+    xy, depth, candidates = xy[in_front], depth[in_front], points[in_front]
+
+    draped = []
+    r2 = radius_px * radius_px
+    for sx, sy in screen_points:
+        d2 = (xy[:, 0] - sx) ** 2 + (xy[:, 1] - sy) ** 2
+        idx = np.flatnonzero(d2 <= r2)
+        if len(idx) == 0:
+            continue
+        # Nearest to the camera; among equally deep, nearest on screen.
+        best = idx[np.lexsort((d2[idx], depth[idx]))[0]]
+        point = tuple(float(v) for v in candidates[best])
+        if not draped or point != draped[-1]:  # neighboring samples often snap to the same point
+            draped.append(point)
+    if len(draped) > 1 and draped[0] == draped[-1]:
+        draped.pop()
+    return draped
+
+
+def resample_closed_polyline(
+    polygon: List[Tuple[float, float]], step: float, max_samples: int = 256
+) -> List[Tuple[float, float]]:
+    """Evenly spaced points along a closed screen polygon, about `step`
+    pixels apart (spacing grows if that would exceed `max_samples`). The
+    original vertices are kept so corners stay sharp."""
+    pts = np.asarray(polygon, dtype=np.float64)
+    closed = np.vstack([pts, pts[:1]])
+    edge_lengths = np.linalg.norm(np.diff(closed, axis=0), axis=1)
+    step = max(step, float(edge_lengths.sum()) / max_samples)
+
+    samples = []
+    for start, end, length in zip(closed[:-1], closed[1:], edge_lengths):
+        count = max(1, int(np.ceil(length / step)))
+        for t in np.arange(count) / count:
+            p = start + (end - start) * t
+            samples.append((float(p[0]), float(p[1])))
+    return samples
 
 
 def points_in_polygon(points_2d: np.ndarray, polygon_2d: List[Tuple[float, float]]) -> np.ndarray:
