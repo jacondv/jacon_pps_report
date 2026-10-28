@@ -40,10 +40,14 @@ def _install_excepthook() -> None:
 
 def _show_splash():
     """Show a splash screen before the heavy 3D-viewer imports, so the user
-    gets immediate feedback even while Windows Defender scans the DLLs."""
+    gets immediate feedback even while Windows Defender scans the DLLs.
+
+    A frameless QLabel rather than QSplashScreen: on Windows,
+    QSplashScreen.show() blocked for ~1 s every launch (measured), while
+    this shows in ~50 ms. Close it with .close() once the window is up."""
     from PySide6.QtCore import Qt
     from PySide6.QtGui import QColor, QFont, QIcon, QPainter, QPixmap
-    from PySide6.QtWidgets import QApplication, QSplashScreen
+    from PySide6.QtWidgets import QApplication, QLabel
 
     pixmap = QPixmap(440, 160)
     pixmap.fill(QColor("#1b1f27"))
@@ -57,13 +61,24 @@ def _show_splash():
     font.setBold(True)
     painter.setFont(font)
     painter.drawText(140, 32, 280, 96, Qt.AlignmentFlag.AlignVCenter, "Jacon PPS Report")
+    font.setPointSize(9)
+    font.setBold(False)
+    painter.setFont(font)
+    painter.setPen(QColor("#9aa3b2"))
+    painter.drawText(
+        0, 0, 428, 150, Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignRight, "Loading…"
+    )
     painter.end()
 
-    splash = QSplashScreen(pixmap)
-    splash.show()
-    splash.showMessage(
-        "Loading…", Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignRight, QColor("#9aa3b2")
+    splash = QLabel()
+    splash.setWindowFlags(
+        Qt.WindowType.SplashScreen
+        | Qt.WindowType.FramelessWindowHint
+        | Qt.WindowType.WindowStaysOnTopHint
     )
+    splash.setPixmap(pixmap)
+    splash.show()
+    splash.repaint()
     QApplication.processEvents()
     return splash
 
@@ -80,16 +95,22 @@ def main() -> None:
     splash = _show_splash()
     logger.info("Theme applied; loading the main window…")
 
+    from PySide6.QtCore import QTimer
+
     from pps.app.preload import start_background_preload
     from pps.ui.main_window import MainWindow
 
     window = MainWindow()
     logger.info("MainWindow constructed; showing…")
     window.showMaximized()
-    splash.finish(window)
+    splash.close()
     logger.info("MainWindow shown; entering event loop")
 
     start_background_preload(app)
+    # Fires once the event loop has processed the window's first paint —
+    # the moment the user actually sees it (tools/measure_startup.py waits
+    # for this line).
+    QTimer.singleShot(0, lambda: logger.info("Event loop running; window painted"))
 
     exit_code = app.exec()
     _dump_loaded_modules()

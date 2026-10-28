@@ -1,8 +1,8 @@
 """
 Dev-only: time from process launch to the main window being shown.
 
-Waits for the "MainWindow shown" line that main.py writes to the app log, so it
-measures what the user sees. For a true cold start (Windows Defender has not
+Waits for the "Event loop running; window painted" line that main.py logs
+after the window's first paint, so it measures what the user sees. For a true cold start (Windows Defender has not
 scanned the DLLs yet) run it once right after rebooting the machine.
 
 Usage (repo root):
@@ -18,7 +18,7 @@ import sys
 import time
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-READY_MARKER = "MainWindow shown"
+READY_MARKER = "Event loop running; window painted"
 TIMEOUT_S = 900
 
 
