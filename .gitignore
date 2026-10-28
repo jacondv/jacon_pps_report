@@ -88,4 +88,11 @@ installer_output/
 # Local machine state (không commit)
 # ======================
 .exclusion_added
-.claude/scheduled_tasks.lock
+
+# ======================
+# AI assistant / agent tooling (local only, never committed)
+# ======================
+.claude/
+.agents/
+CLAUDE.md
+skills-lock.json
