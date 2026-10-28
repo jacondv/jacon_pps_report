@@ -42,7 +42,11 @@ class HTMLPDFGenerator:
                 'zoom': '1.0',
                 'footer-spacing': '2',
             }
-            pdfkit.from_file(html_path, self.output_path, options=options, configuration=config,verbose=True)
+            # verbose=False: with verbose=True pdfkit echoes wkhtmltopdf's
+            # output via sys.stdout.write(), and sys.stdout is None in the
+            # windowed (console=False) build. Failures still raise with
+            # wkhtmltopdf's stderr in the message.
+            pdfkit.from_file(html_path, self.output_path, options=options, configuration=config, verbose=False)
         except Exception as exc:
             logger.error("wkhtmltopdf failed: %s", exc)
             raise RuntimeError(f"wkhtmltopdf failed: {exc}") from exc

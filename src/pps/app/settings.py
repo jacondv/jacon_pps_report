@@ -86,6 +86,12 @@ class AppSettings(QObject):
     def point_size(self, value: int) -> None:
         self._set("point_size", int(value))
 
+    def remember_point_size(self, value: int) -> None:
+        """Persist a point size the caller has already applied (the
+        Properties dock spin box, a loaded project) without emitting
+        `changed` — that would re-apply theme/colors on every spin step."""
+        self._settings.setValue(f"{_SETTINGS_GROUP}/point_size", int(value))
+
     @property
     def background_color(self) -> str:
         return str(self._get("background_color", DEFAULT_BACKGROUND_COLOR, str))

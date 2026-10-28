@@ -6,9 +6,11 @@ title: Calculation & Targets
 <div class="grid-2" markdown="1">
 <div markdown="1">
 
-In the **Properties** dock, set **Min target thickness** and **Max target thickness** (mm) to match the design requirement. The model re-colors and the Results dock refreshes automatically about 0.5 seconds after you stop typing. Max is always kept ≥ Min automatically.
+In the **Properties** dock, set **Min target thickness** and **Max target thickness** (mm) to match the design requirement. The model re-colors automatically about 0.5 seconds after you stop typing. Max is always kept ≥ Min automatically.
 
-Click **Calculate** on the main toolbar to run the full analysis. This runs in the background so the UI stays responsive on large clouds.
+Click **Calculate** on the main toolbar to run the full analysis of the **visible** clouds. This runs in the background so the UI stays responsive on large clouds.
+
+The results belong to the targets and visible clouds they were calculated for. Changing either — editing Min/Max, or showing/hiding a cloud in the Project tree — clears the Results dock; click **Calculate** again (renaming or recoloring a cloud does not).
 
 </div>
 

@@ -4,9 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pps"
-version = "2.0.0"
+dynamic = ["version"]
 description = "Jacon PPS Report"
 requires-python = ">=3.9"
+
+[tool.setuptools.dynamic]
+version = {attr = "pps.__version__"}
 
 [tool.setuptools.packages.find]
 where = ["src"]

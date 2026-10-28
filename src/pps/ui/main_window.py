@@ -10,12 +10,13 @@ import platform
 import subprocess
 import tempfile
 
-from PySide6.QtCore import QSettings, Qt
+from PySide6.QtCore import QSettings, Qt, QTimer
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import QApplication, QFileDialog, QMainWindow, QMessageBox
 
 
 from pps.app.settings import AppSettings
+from pps.app.dialogs import open_measurement_style_editor
 from pps.app.workers import AreaMeasureWorker, CalculationWorker
 from pps.core.filename_parser import parse_filename
 from pps.core.job_info import resolve_targets
@@ -28,7 +29,6 @@ from pps.render.measurement_renderer import MeasurementRenderer
 from pps.render.note_renderer import NoteRenderer
 from pps.render.selection_renderer import SelectionRenderer
 from pps.render.viewport import Viewport
-from pps.report import PDFGenerator
 from pps.scene.document import Document
 from pps.scene.project_io import load_project, save_project
 from pps.tools.base import ToolContext
@@ -41,7 +41,7 @@ from pps.tools.note import NoteTool
 from pps.tools.region_select import RegionSelectTool
 from pps.ui.dialogs.about_dialog import show_about
 from pps.ui.dialogs.settings_dialog import SettingsDialog
-from pps.ui.dialogs.user_guide import open_user_guide
+from pps.ui.dialogs.user_guide import open_user_guide, open_user_guide_pdf
 from pps.ui.widgets.inline_note_editor import open_inline_note_editor
 from pps.ui.widgets.spinner import Spinner
 from pps.ui.docks.project_dock import ProjectDock
@@ -74,6 +74,12 @@ class MainWindow(QMainWindow):
         self._point_size = self.settings_store.point_size
         self._calc_result = None
         self._thickness_dist = None
+        self._calc_result_inputs = None  # _calc_inputs() the result was computed from
+        # Export PDF asked to calculate first; continue the export once the
+        # calculation finishes.
+        self._export_after_calc = False
+        self._calc_worker = None
+        self._calc_worker_inputs = None
         self._area_workers = []  # keep QThreads alive while running
         self.current_project_path = None
 
@@ -134,7 +140,11 @@ class MainWindow(QMainWindow):
         self.measure_area_tool = MeasureAreaTool(area_requester=self._request_area_calculation)
         self.note_tool = NoteTool(note_editor=self._open_note_editor)
         self.annotation_tool = AnnotationTool(note_editor=self._open_note_editor)
-        self.navigate_tool = NavigateTool(note_editor=self._open_note_editor, object_menu=self._object_context_menu)
+        self.navigate_tool = NavigateTool(
+            note_editor=self._open_note_editor,
+            object_menu=self._object_context_menu,
+            measurement_editor=self._open_measurement_style_editor,
+        )
 
         self.tool_manager.register(self.navigate_tool)
         self.tool_manager.register(self.region_select_tool)
@@ -145,6 +155,9 @@ class MainWindow(QMainWindow):
 
     def _open_note_editor(self, existing, screen_pos):
         return open_inline_note_editor(self.viewport.interactor_widget, screen_pos, existing)
+
+    def _open_measurement_style_editor(self, measurement):
+        return open_measurement_style_editor(measurement, parent=self)
 
     def _move_object_preview(self, kind: str, object_id: str, offset_px=None, pos_frac=None) -> None:
         if kind == "note":
@@ -174,12 +187,12 @@ class MainWindow(QMainWindow):
 
         color = get_tokens(self.settings_store.theme)["text"]
         menu = QMenu(self)
-        act_edit = menu.addAction(load_icon("edit", color), "Edit…") if kind == "note" else None
+        act_edit = menu.addAction(load_icon("edit", color), "Edit…")
         menu.addSeparator()
         act_delete = menu.addAction(load_icon("delete", color), "Delete")
 
         chosen = menu.exec(QCursor.pos())
-        if act_edit is not None and chosen is act_edit:
+        if chosen is act_edit:
             return "edit"
         if chosen is act_delete:
             return "delete"
@@ -322,6 +335,9 @@ class MainWindow(QMainWindow):
         action_user_guide = QAction("User Guide", self)
         action_user_guide.triggered.connect(lambda: open_user_guide(self))
         help_menu.addAction(action_user_guide)
+        action_user_guide_pdf = QAction("User Guide (PDF)", self)
+        action_user_guide_pdf.triggered.connect(lambda: open_user_guide_pdf(self))
+        help_menu.addAction(action_user_guide_pdf)
         help_menu.addSeparator()
         action_about = QAction("About", self)
         action_about.triggered.connect(lambda: show_about(self))
@@ -345,6 +361,13 @@ class MainWindow(QMainWindow):
         d.dirty_changed.connect(self._on_dirty_changed)
 
     def _on_document_reset(self) -> None:
+        if self.document.point_size is not None:
+            # A loaded project brings its own point size; it also becomes
+            # the remembered one for the next launch.
+            self._point_size = self.document.point_size
+            self.document.point_size = None
+            self.properties_dock.set_point_size_silently(self._point_size)
+            self.settings_store.remember_point_size(self._point_size)
         self.layer_renderer.clear()
         self.note_renderer.clear()
         self.measurement_renderer.clear()
@@ -371,20 +394,24 @@ class MainWindow(QMainWindow):
         self.color_legend.set_visible(has_cloud)
         self._calc_result = None
         self._thickness_dist = None
+        self._calc_result_inputs = None
         self.results_dock.clear_result()
         self.viewport.render()
 
     def _on_layer_added(self, layer_id: str) -> None:
+        self._discard_stale_calculation()
         layer = self.document.layer_manager.get_by_id(layer_id)
         if layer is not None:
             self.layer_renderer.sync(layer, self.document.target_min, self.document.target_max, self._point_size)
             self.viewport.render()
 
     def _on_layer_removed(self, layer_id: str) -> None:
+        self._discard_stale_calculation()
         self.layer_renderer.remove(layer_id)
         self.viewport.render()
 
     def _on_layer_changed(self, layer_id: str) -> None:
+        self._discard_stale_calculation()
         layer = self.document.layer_manager.get_by_id(layer_id)
         if layer is not None:
             self.layer_renderer.set_visible(layer_id, layer.visible)
@@ -399,6 +426,7 @@ class MainWindow(QMainWindow):
             self.viewport.render()
 
     def _on_targets_changed(self, target_min: float, target_max: float) -> None:
+        self._discard_stale_calculation()
         for layer in self.document.layer_manager.layers:
             self.layer_renderer.sync(layer, target_min, target_max, self._point_size)
         self.color_legend.update(
@@ -409,8 +437,31 @@ class MainWindow(QMainWindow):
         )
         self.viewport.render()
 
+    def _calc_inputs(self) -> tuple:
+        """What a calculation result depends on: the targets and which
+        clouds (layers) are visible — Calculate uses the visible ones."""
+        visible_ids = tuple(layer.id for layer in self.document.layer_manager.visible_layers())
+        return (self.document.target_min, self.document.target_max, visible_ids)
+
+    def _discard_stale_calculation(self) -> None:
+        """Drop the shown results once their inputs changed, so numbers that
+        no longer match the targets/visible clouds can't reach a report.
+        Renaming or recoloring a layer doesn't change the inputs."""
+        if self._calc_result is None or self._calc_result_inputs == self._calc_inputs():
+            return
+        self._calc_result = None
+        self._thickness_dist = None
+        self._calc_result_inputs = None
+        self.results_dock.clear_result()
+        self.statusBar().showMessage(
+            "Target thickness or visible clouds changed — run Calculate again", 8000
+        )
+
     def _on_point_size_changed(self, size: int) -> None:
         self._point_size = size
+        self.settings_store.remember_point_size(size)
+        if self.document.layer_manager.original is not None:
+            self.document.mark_dirty()  # point size is saved in the project
         for layer in self.document.layer_manager.layers:
             self.layer_renderer.sync(layer, self.document.target_min, self.document.target_max, size)
         self.viewport.render()
@@ -575,7 +626,9 @@ class MainWindow(QMainWindow):
     def _save_project_to(self, filepath: str) -> None:
         try:
             camera_state = camera.get_camera_state(self.viewport.plotter)
-            save_project(self.document, filepath, camera_state=camera_state)
+            save_project(
+                self.document, filepath, camera_state=camera_state, point_size=self._point_size
+            )
             self.current_project_path = filepath
             self._add_recent_project(filepath)
             self._update_window_title()
@@ -663,7 +716,10 @@ class MainWindow(QMainWindow):
 
         self._sync_layer_renderer_colors()
         self.viewport.set_background(self.settings_store.background_color)
-        self._point_size = self.settings_store.point_size
+        if self.settings_store.point_size != self._point_size:
+            self._point_size = self.settings_store.point_size
+            if self.document.layer_manager.original is not None:
+                self.document.mark_dirty()  # point size is saved in the project
         for layer in self.document.layer_manager.layers:
             self.layer_renderer.sync(layer, self.document.target_min, self.document.target_max, self._point_size)
         self.color_legend.update(
@@ -701,11 +757,12 @@ class MainWindow(QMainWindow):
         self.selection_dock.set_icon_color(color)
 
     # ------------------------------------------------------------------ Calculate
-    def _on_calculate(self) -> None:
+    def _on_calculate(self) -> bool:
+        """Start the calculation; returns False if it couldn't start."""
         points, distances = self.document.layer_manager.combined_visible()
         if len(points) == 0:
             QMessageBox.warning(self, "Warning", "Please check one or more layers!")
-            return
+            return False
 
         # The worker only ever reports 10% then 100% (run_analysis isn't
         # instrumented for finer-grained progress), so a determinate bar
@@ -721,9 +778,11 @@ class MainWindow(QMainWindow):
         self._calc_worker = CalculationWorker(
             points, distances, self.document.target_min, self.document.target_max, parent=self
         )
+        self._calc_worker_inputs = self._calc_inputs()
         self._calc_worker.finished_ok.connect(self._on_calc_done)
         self._calc_worker.failed.connect(self._on_calc_failed)
         self._calc_worker.start()
+        return True
 
     def _end_calc_busy_state(self) -> None:
         self.results_dock.set_busy(False)
@@ -732,13 +791,26 @@ class MainWindow(QMainWindow):
         QApplication.restoreOverrideCursor()
 
     def _on_calc_done(self, calc, dist) -> None:
+        self._end_calc_busy_state()
+        if self._calc_worker_inputs != self._calc_inputs():
+            # Targets/visible clouds were edited while this ran — already stale.
+            self._export_after_calc = False
+            self.statusBar().showMessage(
+                "Target thickness or visible clouds changed during calculation — run Calculate again", 8000
+            )
+            return
         self._calc_result = calc
         self._thickness_dist = dist
+        self._calc_result_inputs = self._calc_worker_inputs
         self.results_dock.show_result(calc, dist)
-        self._end_calc_busy_state()
         self.statusBar().showMessage("Completed calculation")
+        if self._export_after_calc:
+            self._export_after_calc = False
+            # Let the results dock repaint before the save dialog opens.
+            QTimer.singleShot(0, self._on_export_pdf)
 
     def _on_calc_failed(self, message: str) -> None:
+        self._export_after_calc = False
         self._end_calc_busy_state()
         QMessageBox.critical(
             self, "Calculation Error",
@@ -749,12 +821,28 @@ class MainWindow(QMainWindow):
 
     # ------------------------------------------------------------------ Export PDF
     def _on_export_pdf(self) -> None:
-        if self._calc_result is None:
-            QMessageBox.warning(self, "Warning", "Please run calculation first!")
-            return
         info = self.document.project_info
         if info is None:
             QMessageBox.warning(self, "Warning", "Please load a PLY file first!")
+            return
+        if self._calc_worker is not None and self._calc_worker.isRunning():
+            self._export_after_calc = True
+            self.statusBar().showMessage("Calculating… the report export will start when it finishes")
+            return
+        if self._calc_result is None:
+            # Never calculated, or its inputs changed since — the report must
+            # not show numbers that don't match the current targets/clouds.
+            answer = QMessageBox.question(
+                self, "Calculation required",
+                "The results are missing or out of date (the target thickness "
+                "or the visible clouds changed).\n\nPress OK to calculate now — "
+                "the report export continues when the calculation finishes.",
+                QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel,
+                QMessageBox.StandardButton.Ok,
+            )
+            if answer != QMessageBox.StandardButton.Ok:
+                return
+            self._export_after_calc = self._on_calculate()
             return
 
         visible_layers = self.document.layer_manager.visible_layers()
@@ -789,6 +877,10 @@ class MainWindow(QMainWindow):
                 "report_title": self.settings_store.report_title,
                 "report_logo_path": self.settings_store.report_logo_path or None,
             }
+
+            # Imported here, not at module level: jinja2/pdfkit aren't needed
+            # until the first export, so they shouldn't slow down startup.
+            from pps.report import PDFGenerator
 
             generator = PDFGenerator(filepath)
             out = generator.generate(ctx)

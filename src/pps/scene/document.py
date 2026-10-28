@@ -55,6 +55,10 @@ class Document(QObject):
         self.target_min: float = 40.0
         self.target_max: float = 60.0
         self.camera_state: Optional[dict] = None
+        # Display point size restored from a project file; MainWindow applies
+        # it on `reset` and clears it (same hand-off as camera_state). None =
+        # keep the user's current point size.
+        self.point_size: Optional[int] = None
 
         self.undo_stack = QUndoStack(self)
 
@@ -85,6 +89,7 @@ class Document(QObject):
         self.project_info = None
         self.source_path = None
         self.camera_state = None
+        self.point_size = None
         self._dirty = False
 
     def new_document(self) -> None:

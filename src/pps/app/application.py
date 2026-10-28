@@ -37,6 +37,24 @@ def log_directory() -> str:
     return os.path.join(base, "TunnelAnalyzer", "logs")
 
 
+def use_persistent_matplotlib_cache() -> None:
+    """In the frozen app, keep matplotlib's font cache between runs.
+
+    pyvista imports matplotlib on load, and PyInstaller's matplotlib runtime
+    hook points MPLCONFIGDIR at a temp dir it deletes on exit — so every
+    launch rebuilt the font cache ("generated new fontManager"), adding
+    seconds to startup. Must run before anything imports matplotlib.
+    """
+    if not getattr(sys, "frozen", False):
+        return
+    cache_dir = os.path.join(os.path.dirname(log_directory()), "matplotlib")
+    try:
+        os.makedirs(cache_dir, exist_ok=True)
+    except OSError:
+        return  # fall back to PyInstaller's temp dir
+    os.environ["MPLCONFIGDIR"] = cache_dir
+
+
 def configure_logging(level: int = logging.INFO) -> str:
     """Log to both the console and a rotating file under the user's app
     data directory, so diagnosing a reported issue doesn't depend on the
@@ -54,10 +72,12 @@ def configure_logging(level: int = logging.INFO) -> str:
 
     formatter = logging.Formatter(_LOG_FORMAT)
 
-    console = logging.StreamHandler()
-    console.setFormatter(formatter)
-    console._pps_managed = True
-    root.addHandler(console)
+    # The windowed (console=False) build has no stderr at all.
+    if sys.stderr is not None:
+        console = logging.StreamHandler()
+        console.setFormatter(formatter)
+        console._pps_managed = True
+        root.addHandler(console)
 
     log_dir = log_directory()
     log_path = os.path.join(log_dir, "app.log")
@@ -77,6 +97,26 @@ def configure_logging(level: int = logging.INFO) -> str:
     return log_path
 
 
+# Identifies the app to the Windows shell when run from source; without it
+# the taskbar groups the window under python.exe and shows Python's icon.
+WINDOWS_APP_USER_MODEL_ID = "JaconEquipment.PPSReport"
+
+
+def _set_windows_app_id() -> None:
+    """Only for `python main.py`. The packaged exe must NOT set an explicit
+    ID: Windows would then take the taskbar icon from a shortcut carrying the
+    same ID and, finding none, show a generic icon. Left alone, the taskbar
+    uses the exe's own icon (the Jacon PPS logo)."""
+    if sys.platform != "win32" or getattr(sys, "frozen", False):
+        return
+    import ctypes
+
+    try:
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(WINDOWS_APP_USER_MODEL_ID)
+    except (AttributeError, OSError):
+        pass  # very old Windows: cosmetic only
+
+
 def create_app(argv: list) -> QApplication:
     """Return the QApplication, creating it with Hi-DPI handling configured.
 
@@ -89,6 +129,7 @@ def create_app(argv: list) -> QApplication:
     if existing is not None:
         return existing
 
+    _set_windows_app_id()
     QGuiApplication.setHighDpiScaleFactorRoundingPolicy(
         Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
     )

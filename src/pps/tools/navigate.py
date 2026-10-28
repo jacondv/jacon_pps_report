@@ -14,15 +14,21 @@ exactly when you've grabbed one.
 from typing import Callable, Optional, Tuple
 
 from pps.render.labels import compute_label_bbox, compute_screen_note_bbox
-from pps.scene.commands import DeleteMeasurementCommand, DeleteNoteCommand, EditNoteCommand, MoveNoteCommand
+from pps.scene.commands import (
+    DeleteMeasurementCommand,
+    DeleteNoteCommand,
+    EditNoteCommand,
+    MoveNoteCommand,
+    UpdateMeasurementCommand,
+)
 from pps.scene.measurements import DistanceMeasurement
 from pps.tools.base import MouseButton, PointerEvent, PointerEventType, Tool
 
 NoteEditor = Callable[[Optional[object], Tuple[float, float]], Optional[dict]]
 ObjectMenu = Callable[[str, str], Optional[str]]  # (kind, object_id) -> "edit" | "delete" | None
+MeasurementEditor = Callable[[object], Optional[dict]]  # measurement -> changed {color, font_size} or None
 
 DRAG_THRESHOLD_PX = 3
-_MEASUREMENT_LABEL_FONT_SIZE = 14  # matches the default MeasurementRenderer builds labels with
 
 
 def _midpoint(p1, p2) -> Tuple[float, float, float]:
@@ -53,10 +59,16 @@ class NavigateTool(Tool):
     shortcut = "V"
     cursor = None
 
-    def __init__(self, note_editor: NoteEditor = None, object_menu: ObjectMenu = None):
+    def __init__(
+        self,
+        note_editor: NoteEditor = None,
+        object_menu: ObjectMenu = None,
+        measurement_editor: MeasurementEditor = None,
+    ):
         super().__init__()
         self.note_editor = note_editor
         self.object_menu = object_menu
+        self.measurement_editor = measurement_editor
         self._selected: Optional[Tuple[str, str]] = None  # (kind, object_id)
         self._dragging = False
         self._drag_start_pos: Optional[Tuple[float, float]] = None
@@ -145,16 +157,29 @@ class NavigateTool(Tool):
             return True
 
         action = self.object_menu(kind, object_id)
-        if action == "edit" and kind == "note" and self.note_editor is not None:
-            note = self.ctx.document._find_note(object_id)
-            if note is not None:
-                result = self.note_editor(note, (event.x, event.y))
-                if result is not None:
-                    self.ctx.undo_stack.push(EditNoteCommand(self.ctx.document, note.id, **result))
+        if action == "edit":
+            self._edit(kind, object_id, (event.x, event.y))
         elif action == "delete":
             self._delete(kind, object_id)
             self._clear_selection()
         return True
+
+    def _edit(self, kind: str, object_id: str, screen_pos: Tuple[float, float]) -> None:
+        document = self.ctx.document
+        if kind == "note":
+            note = document._find_note(object_id)
+            if note is None or self.note_editor is None:
+                return
+            result = self.note_editor(note, screen_pos)
+            if result is not None:
+                self.ctx.undo_stack.push(EditNoteCommand(document, note.id, **result))
+            return
+        measurement = document._find_measurement(object_id)
+        if measurement is None or self.measurement_editor is None:
+            return
+        changes = self.measurement_editor(measurement)
+        if changes:
+            self.ctx.undo_stack.push(UpdateMeasurementCommand(document, measurement.id, **changes))
 
     # ------------------------------------------------------------------ drag
     def _current_value(self, note_id: str):
@@ -249,7 +274,7 @@ class NavigateTool(Tool):
 
         for measurement in reversed(self.ctx.document.measurements):
             kind, anchor, text = _measurement_display(measurement)
-            bbox = compute_label_bbox(anchor, measurement.label_offset_px, text, _MEASUREMENT_LABEL_FONT_SIZE, plotter)
+            bbox = compute_label_bbox(anchor, measurement.label_offset_px, text, measurement.font_size, plotter)
             if bbox is not None and _contains(bbox, x, y):
                 return (kind, measurement.id, False)
 

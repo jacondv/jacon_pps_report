@@ -9,7 +9,10 @@ camera rotates/zooms/pans, unlike the old pixel-anchored system.
 from typing import Optional, Tuple
 
 import numpy as np
-import vtk
+from vtkmodules.vtkCommonCore import vtkPoints
+from vtkmodules.vtkCommonDataModel import vtkCellArray, vtkLine, vtkPolyData
+from vtkmodules.vtkFiltersSources import vtkSphereSource
+from vtkmodules.vtkRenderingCore import vtkActor, vtkActor2D, vtkBillboardTextActor3D, vtkPolyDataMapper, vtkPolyDataMapper2D, vtkTextActor
 
 from pps.render.picking import project_to_screen
 
@@ -112,7 +115,7 @@ class ScreenLabel:
         self.text = text
         self.font_size = font_size
 
-        self._text_actor = vtk.vtkTextActor()
+        self._text_actor = vtkTextActor()
         self._text_actor.SetInput(text)
         prop = self._text_actor.GetTextProperty()
         prop.SetFontSize(font_size)
@@ -206,7 +209,7 @@ class AnchoredLabel:
         self._marker_actor = self._build_marker(marker_radius, color)
         plotter.renderer.AddActor(self._marker_actor)
 
-        self._text_actor = vtk.vtkBillboardTextActor3D()
+        self._text_actor = vtkBillboardTextActor3D()
         self._text_actor.SetPosition(*self.anchor)
         self._text_actor.SetInput(text)
         self._text_actor.SetDisplayOffset(*self.offset_px)
@@ -218,8 +221,8 @@ class AnchoredLabel:
         self._apply_text_color(color)
         plotter.renderer.AddActor(self._text_actor)
 
-        self._leader_mapper = vtk.vtkPolyDataMapper2D()
-        self._leader_actor = vtk.vtkActor2D()
+        self._leader_mapper = vtkPolyDataMapper2D()
+        self._leader_actor = vtkActor2D()
         self._leader_actor.SetMapper(self._leader_mapper)
         self._leader_actor.GetProperty().SetLineWidth(line_width)
         self._apply_leader_color(color)
@@ -286,15 +289,15 @@ class AnchoredLabel:
         ax, ay = anchor_pos
         lx, ly = ax + self.offset_px[0], ay + self.offset_px[1]
 
-        points = vtk.vtkPoints()
+        points = vtkPoints()
         points.InsertNextPoint(ax, ay, 0.0)
         points.InsertNextPoint(lx, ly, 0.0)
-        line = vtk.vtkLine()
+        line = vtkLine()
         line.GetPointIds().SetId(0, 0)
         line.GetPointIds().SetId(1, 1)
-        cells = vtk.vtkCellArray()
+        cells = vtkCellArray()
         cells.InsertNextCell(line)
-        poly = vtk.vtkPolyData()
+        poly = vtkPolyData()
         poly.SetPoints(points)
         poly.SetLines(cells)
         self._leader_mapper.SetInputData(poly)
@@ -316,15 +319,15 @@ class AnchoredLabel:
                 pass
 
     # ------------------------------------------------------------------ construction helpers
-    def _build_marker(self, radius: float, color: str) -> vtk.vtkActor:
-        sphere = vtk.vtkSphereSource()
+    def _build_marker(self, radius: float, color: str) -> vtkActor:
+        sphere = vtkSphereSource()
         sphere.SetRadius(radius)
         sphere.SetCenter(*self.anchor)
         sphere.SetThetaResolution(12)
         sphere.SetPhiResolution(12)
-        mapper = vtk.vtkPolyDataMapper()
+        mapper = vtkPolyDataMapper()
         mapper.SetInputConnection(sphere.GetOutputPort())
-        actor = vtk.vtkActor()
+        actor = vtkActor()
         actor.SetMapper(mapper)
         actor.GetProperty().SetColor(*hex_to_rgb(color))
         return actor

@@ -9,7 +9,7 @@ import os
 
 import numpy as np
 import pytest
-import vtk
+from vtkmodules.vtkRenderingCore import vtkTextActor
 
 from pps.core.layers import LayerManager
 from pps.core.ply_loader import load_ply
@@ -94,7 +94,7 @@ def test_viewport_renders_layer_and_overlay(qtbot, sample_ply_path, tmp_path):
     reset_view(viewport.plotter)
 
     # Distinct yellow marker on the overlay (layer 1) render.
-    marker = vtk.vtkTextActor()
+    marker = vtkTextActor()
     marker.SetInput("X")
     marker.SetPosition(5, 5)
     marker.GetTextProperty().SetFontSize(40)

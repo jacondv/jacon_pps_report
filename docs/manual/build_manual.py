@@ -1,6 +1,6 @@
 """
-Build src/pps/ui/help/user_guide.html from the per-section Markdown files
-under docs/manual/sections/.
+Build src/pps/ui/help/user_guide.html (and a PDF copy) from the per-section
+Markdown files under docs/manual/sections/.
 
 Each section file is plain Markdown with a small frontmatter header:
 
@@ -27,11 +27,18 @@ Sections whose frontmatter sets `raw: true` are inserted as literal HTML
 (no title wrapper, no Markdown conversion) — used for the safety warning
 box and the contact card, which are fixed layouts rather than prose.
 
+The same section content is also rendered through template_pdf.html (a
+single-column, print-friendly layout — no sticky sidebar) and converted to
+User_Guide.pdf via the wkhtmltopdf binary already vendored for PDF report
+export (src/pps/report/packages/wkhtmltox), so the guide can be printed or
+shared outside the app too.
+
 Run:
     python docs/manual/build_manual.py
 """
 import re
 import shutil
+import sys
 from pathlib import Path
 
 import markdown
@@ -40,10 +47,15 @@ MANUAL_DIR = Path(__file__).resolve().parent
 SECTIONS_DIR = MANUAL_DIR / "sections"
 IMAGES_DIR = MANUAL_DIR / "images"
 TEMPLATE_FILE = MANUAL_DIR / "template.html"
+PDF_TEMPLATE_FILE = MANUAL_DIR / "template_pdf.html"
 
-HELP_DIR = MANUAL_DIR.parent.parent / "src/pps/ui/help"
+REPO_ROOT = MANUAL_DIR.parent.parent
+HELP_DIR = REPO_ROOT / "src/pps/ui/help"
 OUTPUT_FILE = HELP_DIR / "user_guide.html"
 OUTPUT_IMAGES_DIR = HELP_DIR / "images"
+OUTPUT_PDF = HELP_DIR / "User_Guide.pdf"
+REPO_PDF_COPY = MANUAL_DIR / "User_Guide.pdf"
+WKHTMLTOPDF = REPO_ROOT / "src/pps/report/packages/wkhtmltox/bin/wkhtmltopdf.exe"
 
 FIGURE_RE = re.compile(r"```figure\s*\n(.*?)\n```", re.DOTALL)
 FRONTMATTER_RE = re.compile(r"\A---\s*\n(.*?)\n---\s*\n?", re.DOTALL)
@@ -71,7 +83,7 @@ def render_figure(block: str) -> str:
     lines = block.splitlines()
     key = None
     for line in lines:
-        m = re.match(r"^(image|caption|style):\s*(.*)$", line)
+        m = re.match(r"^(image|caption|style|width):\s*(.*)$", line)
         if m:
             key, value = m.group(1), m.group(2)
             fields[key] = value
@@ -82,7 +94,15 @@ def render_figure(block: str) -> str:
         raise FileNotFoundError(f"docs/manual/images/{image} not found (referenced by a figure block)")
     caption_html = MD.reset().convert(fields.get("caption", "").strip())
     caption_html = re.sub(r"^<p>|</p>$", "", caption_html.strip())
-    style = ' style="margin:0;"' if fields.get("style") == "flush" else ""
+    style_parts = []
+    if fields.get("style") == "flush":
+        style_parts.append("margin:0")
+    if fields.get("width"):
+        width = fields["width"].strip()
+        style_parts.append(f"max-width:{width}")
+        style_parts.append("margin-left:auto")
+        style_parts.append("margin-right:auto")
+    style = f' style="{";".join(style_parts)};"' if style_parts else ""
     return (
         f'<figure{style}>\n'
         f'        <img src="images/{image}" alt="">\n'
@@ -123,6 +143,39 @@ def render_section(meta: dict, body: str) -> str:
     return f'    <section id="{meta["id"]}">\n      {heading}{indented_body.strip()}\n    </section>\n'
 
 
+def render_pdf(toc_html: str, sections_html: str) -> None:
+    if not WKHTMLTOPDF.is_file():
+        print(f"Skipping PDF: wkhtmltopdf not found at {WKHTMLTOPDF}", file=sys.stderr)
+        return
+
+    import pdfkit
+
+    pdf_template = PDF_TEMPLATE_FILE.read_text(encoding="utf-8")
+    pdf_html = pdf_template.replace("{{TOC}}", toc_html).replace("{{SECTIONS}}", sections_html)
+
+    # Written next to OUTPUT_IMAGES_DIR (already populated by main()) so the
+    # figure blocks' relative "images/…" src resolves the same as the HTML.
+    source_file = HELP_DIR / "_user_guide_pdf_source.html"
+    source_file.write_text(pdf_html, encoding="utf-8", newline="\n")
+
+    config = pdfkit.configuration(wkhtmltopdf=str(WKHTMLTOPDF))
+    options = {
+        "enable-local-file-access": None,
+        "page-size": "A4",
+        "margin-top": "15mm",
+        "margin-bottom": "15mm",
+        "margin-left": "18mm",
+        "margin-right": "18mm",
+    }
+    try:
+        pdfkit.from_file(str(source_file), str(OUTPUT_PDF), options=options, configuration=config)
+    finally:
+        source_file.unlink(missing_ok=True)
+
+    shutil.copyfile(OUTPUT_PDF, REPO_PDF_COPY)
+    print(f"Wrote {OUTPUT_PDF} (and a copy at {REPO_PDF_COPY})")
+
+
 def main() -> None:
     section_files = sorted(SECTIONS_DIR.glob("*.md"))
     if not section_files:
@@ -138,10 +191,11 @@ def main() -> None:
         )
         toc_lines.append(f'    <a href="#{meta["id"]}">{nav_label}</a>')
 
+    toc_html = "\n".join(toc_lines)
+    sections_html = "\n".join(section_html)
+
     template = TEMPLATE_FILE.read_text(encoding="utf-8")
-    html = template.replace("{{TOC}}", "\n".join(toc_lines)).replace(
-        "{{SECTIONS}}", "\n".join(section_html)
-    )
+    html = template.replace("{{TOC}}", toc_html).replace("{{SECTIONS}}", sections_html)
 
     HELP_DIR.mkdir(parents=True, exist_ok=True)
     OUTPUT_FILE.write_text(html, encoding="utf-8", newline="\n")
@@ -151,6 +205,8 @@ def main() -> None:
     shutil.copytree(IMAGES_DIR, OUTPUT_IMAGES_DIR)
 
     print(f"Wrote {OUTPUT_FILE} ({len(section_files)} sections, {len(list(OUTPUT_IMAGES_DIR.iterdir()))} images)")
+
+    render_pdf(toc_html, sections_html)
 
 
 if __name__ == "__main__":

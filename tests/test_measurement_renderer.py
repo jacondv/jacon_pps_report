@@ -1,5 +1,5 @@
 import numpy as np
-import vtk
+from vtkmodules.vtkRenderingCore import vtkRenderWindow, vtkRenderer
 
 from pps.core.layers import SourceRef
 from pps.render.measurement_renderer import MeasurementRenderer
@@ -12,8 +12,8 @@ class FakePlotter:
     VTK renderer + render window, no Qt widget needed."""
 
     def __init__(self):
-        self.renderer = vtk.vtkRenderer()
-        self.ren_win = vtk.vtkRenderWindow()
+        self.renderer = vtkRenderer()
+        self.ren_win = vtkRenderWindow()
         self.ren_win.SetOffScreenRendering(1)
         self.ren_win.AddRenderer(self.renderer)
         self.ren_win.SetSize(400, 300)
@@ -21,7 +21,7 @@ class FakePlotter:
 
 def make_renderer():
     plotter = FakePlotter()
-    overlay = Overlay(vtk.vtkRenderer())
+    overlay = Overlay(vtkRenderer())
     return MeasurementRenderer(plotter, overlay)
 
 
@@ -32,14 +32,13 @@ def test_sync_distance_creates_line_and_label():
     renderer.sync_one(measurement)
 
     assert measurement.id in renderer._labels
-    assert measurement.id in renderer._line_actors
-    assert measurement.id not in renderer._boundary_actors
+    assert measurement.id in renderer._world_actors
 
 
-def test_sync_area_creates_boundary_and_label():
+def test_sync_area_creates_3d_outline_and_label():
     renderer = make_renderer()
     measurement = AreaMeasurement(
-        boundary_px_at_creation=[(0.0, 0.0), (10.0, 0.0), (10.0, 10.0)],
+        outline=[(0.0, 0.0, 0.0), (10.0, 0.0, 0.0), (10.0, 10.0, 0.0)],
         sources=[SourceRef(layer_id="layer-1", indices=np.array([0, 1], dtype=np.uint32))],
         centroid=(1.0, 1.0, 0.0),
         area_m2=None,
@@ -48,8 +47,10 @@ def test_sync_area_creates_boundary_and_label():
     renderer.sync_one(measurement)
 
     assert measurement.id in renderer._labels
-    assert measurement.id in renderer._boundary_actors
-    assert measurement.id not in renderer._line_actors
+    outline_actor = renderer._world_actors[measurement.id]
+    # A world-space actor in the 3D scene (follows the camera), not a 2D overlay.
+    assert renderer._plotter.renderer.HasViewProp(outline_actor)
+    assert outline_actor.GetMapper().GetInput().GetNumberOfPoints() == 3
 
 
 def test_sync_all_removes_stale_entries():
@@ -71,19 +72,18 @@ def test_remove_and_clear():
 
     renderer.remove(m1.id)
     assert m1.id not in renderer._labels
-    assert m1.id not in renderer._line_actors
+    assert m1.id not in renderer._world_actors
 
     renderer.sync_one(m1)
     renderer.clear()
     assert renderer._labels == {}
-    assert renderer._line_actors == {}
-    assert renderer._boundary_actors == {}
+    assert renderer._world_actors == {}
 
 
 def test_sync_one_rebuilds_on_update():
     renderer = make_renderer()
     measurement = AreaMeasurement(
-        boundary_px_at_creation=[(0.0, 0.0), (10.0, 0.0), (10.0, 10.0)],
+        outline=[(0.0, 0.0, 0.0), (10.0, 0.0, 0.0), (10.0, 10.0, 0.0)],
         sources=[],
         centroid=(1.0, 1.0, 0.0),
         area_m2=None,
@@ -96,3 +96,28 @@ def test_sync_one_rebuilds_on_update():
 
     assert renderer._labels[measurement.id] is not first_label
     assert renderer._labels[measurement.id].text == "12.30 m²"
+
+
+def test_area_without_outline_has_label_only():
+    # Measurements from projects saved before outlines were stored in 3D.
+    renderer = make_renderer()
+    measurement = AreaMeasurement(outline=[], sources=[], centroid=(1.0, 1.0, 0.0), area_m2=3.0)
+    renderer.sync_one(measurement)
+    assert measurement.id in renderer._labels
+    assert measurement.id not in renderer._world_actors
+
+
+def test_labels_use_each_measurements_color_and_font_size():
+    renderer = make_renderer()
+    distance = DistanceMeasurement(p1=(0.0, 0.0, 0.0), p2=(1.0, 0.0, 0.0), color="#ff0000", font_size=22)
+    area = AreaMeasurement(
+        outline=[(0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (1.0, 1.0, 0.0)],
+        sources=[], centroid=(0.5, 0.5, 0.0), area_m2=1.0, color="#00ff00", font_size=9,
+    )
+    renderer.sync_all([distance, area])
+
+    for m, rgb in ((distance, (1.0, 0.0, 0.0)), (area, (0.0, 1.0, 0.0))):
+        label = renderer._labels[m.id]
+        assert label.font_size == m.font_size
+        assert label._text_actor.GetTextProperty().GetFontSize() == m.font_size
+        assert renderer._world_actors[m.id].GetProperty().GetColor() == rgb

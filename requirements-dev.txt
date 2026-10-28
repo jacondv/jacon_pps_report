@@ -1,0 +1,8 @@
+# Jacon PPS Report — development / test / build requirements
+# Install together with the runtime ones:
+#   pip install -r requirements.txt -r requirements-dev.txt
+
+pytest>=7.0.0
+pytest-qt>=4.2.0
+pyinstaller>=6.0.0
+markdown>=3.5.0  # docs/manual/build_manual.py only, not used at app runtime

@@ -27,6 +27,12 @@ cd PPS_Report_PC
 pip install -r requirements.txt
 ```
 
+Để chạy test và build exe, cài thêm công cụ dev:
+
+```bash
+pip install -r requirements-dev.txt
+```
+
 Hoặc dùng `uv` (khuyến nghị):
 
 ```bash

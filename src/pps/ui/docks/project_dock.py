@@ -25,6 +25,7 @@ from pps.scene.commands import (
     EditNoteCommand,
     RemoveLayerCommand,
     RenameLayerCommand,
+    UpdateMeasurementCommand,
 )
 from pps.scene.measurements import DistanceMeasurement
 from pps.ui.icons import load_icon
@@ -247,10 +248,23 @@ class ProjectDock(QDockWidget):
             self.object_selected.emit(kind, object_id)
 
     def _on_item_double_clicked(self, item: QTreeWidgetItem, _column: int = 0) -> None:
-        kind = item.data(0, _ROLE_KIND)
-        if kind != _KIND_NOTE:
+        self._edit_object(item.data(0, _ROLE_KIND), item.data(0, _ROLE_ID))
+
+    def _edit_object(self, kind, object_id) -> None:
+        if kind == _KIND_NOTE:
+            self._edit_note(object_id)
+        elif kind in (_KIND_DISTANCE, _KIND_AREA):
+            self._edit_measurement(object_id)
+
+    def _edit_measurement(self, measurement_id: str) -> None:
+        measurement = self.document._find_measurement(measurement_id)
+        if measurement is None:
             return
-        self._edit_note(item.data(0, _ROLE_ID))
+        from pps.app.dialogs import open_measurement_style_editor
+
+        changes = open_measurement_style_editor(measurement, parent=self)
+        if changes:
+            self.document.undo_stack.push(UpdateMeasurementCommand(self.document, measurement.id, **changes))
 
     def _edit_note(self, note_id: str) -> None:
         note = self.document._find_note(note_id)
@@ -349,7 +363,7 @@ class ProjectDock(QDockWidget):
 
         color = self._icon_color()
         menu = QMenu(self)
-        act_edit = menu.addAction(load_icon("edit", color), "Edit…") if kind == _KIND_NOTE else None
+        act_edit = menu.addAction(load_icon("edit", color), "Edit…")
         # Dragging to reposition is currently only wired up for notes'/
         # annotations' text (Note and Annotation tools) — measurements
         # don't support it yet.
@@ -361,8 +375,8 @@ class ProjectDock(QDockWidget):
         act_delete = menu.addAction(load_icon("delete", color), "Delete")
 
         chosen = menu.exec(self.list_widget.mapToGlobal(pos))
-        if act_edit is not None and chosen == act_edit:
-            self._edit_note(object_id)
+        if chosen == act_edit:
+            self._edit_object(kind, object_id)
         elif act_move is not None and chosen == act_move:
             self.move_requested.emit(kind, object_id)
         elif chosen == act_toggle:

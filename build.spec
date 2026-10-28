@@ -15,14 +15,62 @@
 # See src/pps/utils/path_helper.py and src/pps/ui/icons.py for the exact
 # lookup logic if either of these ever need to change.
 
+import ast
 import os
 
 from PyInstaller.building.build_main import Analysis, PYZ, EXE, COLLECT
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
+from PyInstaller.utils.win32.versioninfo import (
+    FixedFileInfo,
+    StringFileInfo,
+    StringStruct,
+    StringTable,
+    VarFileInfo,
+    VarStruct,
+    VSVersionInfo,
+)
 
 block_cipher = None
 
 SRC = os.path.join("src", "pps")
+APP_ICON = os.path.join(SRC, "ui", "icons", "app.ico")  # Jacon PPS logo (see pps.ui.icons)
+APP_NAME = "Jacon PPS Report"
+COMPANY = "Jacon Equipment"
+
+
+def _read_version():
+    """pps.__version__, read without importing the package."""
+    with open(os.path.join(SRC, "__init__.py"), encoding="utf-8") as f:
+        for node in ast.parse(f.read()).body:
+            if isinstance(node, ast.Assign) and node.targets[0].id == "__version__":
+                return node.value.value
+    raise RuntimeError("__version__ not found in src/pps/__init__.py")
+
+
+def _version_resource(version):
+    """Windows version info shown in the exe's Properties -> Details; the
+    installer (installer.iss) reads its version from here too."""
+    numbers = tuple(int(n) for n in version.split(".")) + (0,) * (4 - len(version.split(".")))
+    strings = [
+        StringStruct("CompanyName", COMPANY),
+        StringStruct("FileDescription", APP_NAME),
+        StringStruct("FileVersion", version),
+        StringStruct("InternalName", APP_NAME),
+        StringStruct("LegalCopyright", f"Copyright (C) {COMPANY}"),
+        StringStruct("OriginalFilename", f"{APP_NAME}.exe"),
+        StringStruct("ProductName", APP_NAME),
+        StringStruct("ProductVersion", version),
+    ]
+    return VSVersionInfo(
+        ffi=FixedFileInfo(filevers=numbers, prodvers=numbers),
+        kids=[
+            StringFileInfo([StringTable("040904B0", strings)]),  # US English, Unicode
+            VarFileInfo([VarStruct("Translation", [0x0409, 1200])]),
+        ],
+    )
+
+
+APP_VERSION = _read_version()
 
 datas = [
     (os.path.join(SRC, "report", "assets"), os.path.join("report", "assets")),
@@ -30,18 +78,32 @@ datas = [
     (os.path.join(SRC, "report", "packages"), os.path.join("report", "packages")),
     (os.path.join(SRC, "ui", "icons", "svg"), os.path.join("pps", "ui", "icons", "svg")),
     (os.path.join(SRC, "ui", "help"), os.path.join("pps", "ui", "help")),
-    ("sample", "sample"),
-    ("assets", "assets"),
+    (APP_ICON, os.path.join("pps", "ui", "icons")),
+    (os.path.join("sample", "*.ply"), "sample"),
 ]
-datas += collect_data_files("open3d")
+
+# open3d is only used for the BPA surface area. Its resources/ folder
+# (~39 MB of fonts/materials) and the Jupyter/notebook extensions belong to
+# open3d's own GUI viewer, which the app never opens. Keep the rest
+# (tbb12.dll, ml/visualization data that `import open3d` loads).
+_OPEN3D_UNUSED_DATA = {"resources", "labextension", "nbextension", "examples"}
+
+
+def _open3d_subdir(dst):
+    """'open3d/resources/x' -> 'resources'; files directly in open3d/ -> ''."""
+    parts = dst.replace(os.sep, "/").split("/")
+    return parts[1] if len(parts) > 1 else ""
+
+
+datas += [
+    (src, dst)
+    for src, dst in collect_data_files("open3d")
+    if _open3d_subdir(dst) not in _OPEN3D_UNUSED_DATA
+]
 
 hiddenimports = [
     "PySide6.QtSvg",
     "PySide6.QtPrintSupport",
-    "vtkmodules",
-    "vtkmodules.all",
-    "vtkmodules.util.misc",
-    "vtkmodules.util.numpy_support",
     "pyvista",
     "pyvistaqt",
     "open3d",
@@ -49,11 +111,34 @@ hiddenimports = [
     "jinja2",
     "matplotlib",
     "matplotlib.backends.backend_agg",
-    "reportlab",
     "plyfile",
-    "scipy",
 ]
 hiddenimports += collect_submodules("open3d")
+
+# Never imported at runtime (checked against docs/dep-slimming/used-modules-*.txt
+# and open3d-imports.txt). Without these excludes PyInstaller still follows
+# static imports into them. Do NOT exclude IPython/jedi/dash/flask/plotly:
+# `import open3d` loads them.
+excludes = [
+    "PyQt5",
+    "PyQt6",
+    "tkinter",
+    "scipy",
+    "reportlab",
+    "pytest",
+    "_pytest",
+    "nbformat",
+    "jsonschema",
+    "docutils",
+    "vtk",
+    "vtkmodules.all",
+    "vtkmodules.web",
+    "vtkmodules.test",
+    "pyvista.trame",
+    "pyvista.ext",
+    "pyvista.examples",
+    "pyvista.demos",
+]
 
 a = Analysis(
     ["main.py"],
@@ -63,9 +148,17 @@ a = Analysis(
     hiddenimports=hiddenimports,
     hookspath=["."],
     runtime_hooks=[],
-    excludes=["PyQt5"],
+    excludes=excludes,
     cipher=block_cipher,
 )
+
+# jedi is only here because `import open3d` imports IPython. Its type stubs
+# (jedi/third_party: typeshed + django-stubs, ~5,500 .pyi files) are for code
+# completion, which the app never does; newer hook versions collect them.
+a.datas = [
+    entry for entry in a.datas
+    if not entry[0].replace("\\", "/").startswith("jedi/third_party/")
+]
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
@@ -73,10 +166,16 @@ exe = EXE(
     pyz,
     a.scripts,
     exclude_binaries=True,
-    name="Jacon PPS Report",
+    name=APP_NAME,
     debug=False,
-    console=True,
-    icon="assets/icon.ico",
+    # No console window: everything is logged to
+    # %LOCALAPPDATA%\TunnelAnalyzer\logs\app.log (see pps.app.application).
+    console=False,
+    # UPX-packed binaries are slower to load and more likely to be flagged
+    # by antivirus.
+    upx=False,
+    icon=APP_ICON,
+    version=_version_resource(APP_VERSION),
 )
 
 coll = COLLECT(
@@ -84,5 +183,6 @@ coll = COLLECT(
     a.binaries,
     a.zipfiles,
     a.datas,
-    name="Jacon PPS Report",
+    upx=False,
+    name=APP_NAME,
 )

@@ -13,6 +13,14 @@ from PySide6.QtSvg import QSvgRenderer
 
 _ICON_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icons", "svg")
 
+# The Jacon PPS logo: window/taskbar icon, splash, and (via build.spec /
+# installer.iss) the exe and installer icon.
+APP_ICON_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icons", "app.ico")
+
+
+def app_icon() -> QIcon:
+    return QIcon(APP_ICON_PATH)
+
 
 def load_icon(name: str, color: str, size: int = 24) -> QIcon:
     """`name` is the SVG filename without extension, e.g. "navigate"."""

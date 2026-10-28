@@ -6,6 +6,7 @@ exit criterion), and produce PDF numbers matching the golden baseline.
 
 import json
 import os
+import sys
 
 import pytest
 from PySide6.QtCore import Qt
@@ -17,13 +18,19 @@ from pps.ui.main_window import MainWindow
 
 @pytest.fixture
 def main_window(qtbot):
-    window = MainWindow()
-    qtbot.addWidget(window)
-    yield window
     # Bypass the unsaved-changes confirmation dialog on teardown — that flow
     # has its own dedicated tests below and must not block here on a real
-    # (non-mocked) QMessageBox if a test left the document dirty.
-    window.document._dirty = False
+    # (non-mocked) QMessageBox if a test left the document dirty. pytest-qt
+    # closes registered widgets in its own teardown hook, before this
+    # fixture's code after `yield` runs, so the reset has to happen in
+    # before_close_func.
+    def _discard_changes(w):
+        w.document._dirty = False
+
+    window = MainWindow()
+    qtbot.addWidget(window, before_close_func=_discard_changes)
+    yield window
+    _discard_changes(window)
     window.close()
 
 
@@ -127,7 +134,10 @@ def test_select_by_thickness_and_extract_segment(main_window, sample_ply_path):
     assert main_window.layer_renderer.get(segment.id) is None
 
 
-def test_export_pdf_produces_real_file(main_window, sample_ply_path, tmp_path, qtbot, monkeypatch):
+# "windowed": the shipped exe is built with console=False, where sys.stdout is
+# None — anything in the export path writing to it would fail the export.
+@pytest.mark.parametrize("windowed", [False, True], ids=["console", "windowed"])
+def test_export_pdf_produces_real_file(main_window, sample_ply_path, tmp_path, qtbot, monkeypatch, windowed):
     main_window._load_file(sample_ply_path)
     main_window._on_calculate()
     with qtbot.waitSignal(main_window._calc_worker.finished_ok, timeout=60000):
@@ -139,6 +149,14 @@ def test_export_pdf_produces_real_file(main_window, sample_ply_path, tmp_path, q
     )
     monkeypatch.setattr("pps.ui.main_window.QMessageBox.information", lambda *a, **k: None)
     monkeypatch.setattr("os.startfile", lambda *a, **k: None, raising=False)
+
+    def fail_on_error_dialog(_parent, _title, text, *a, **k):
+        raise AssertionError(text)
+
+    monkeypatch.setattr("pps.ui.main_window.QMessageBox.critical", fail_on_error_dialog)
+    if windowed:
+        monkeypatch.setattr(sys, "stdout", None)
+        monkeypatch.setattr(sys, "stderr", None)
 
     main_window._on_export_pdf()
 
@@ -315,3 +333,145 @@ def test_close_with_unsaved_changes_discard_proceeds(main_window, sample_ply_pat
     event = QCloseEvent()
     main_window.closeEvent(event)
     assert event.isAccepted()
+
+
+def _calculate(main_window, qtbot):
+    assert main_window._on_calculate() is True
+    with qtbot.waitSignal(main_window._calc_worker.finished_ok, timeout=60000):
+        pass
+
+
+def test_changing_targets_invalidates_calculation(main_window, sample_ply_path, qtbot):
+    main_window._load_file(sample_ply_path)
+    _calculate(main_window, qtbot)
+    assert main_window._calc_result is not None
+    assert main_window.results_dock.lbl_area.text() != "-"
+
+    main_window.document.set_targets(50.0, 150.0)
+
+    assert main_window._calc_result is None
+    assert main_window._thickness_dist is None
+    assert main_window.results_dock.lbl_area.text() == "-"
+
+
+def test_export_without_calculation_cancel_does_nothing(main_window, sample_ply_path, monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+
+    main_window._load_file(sample_ply_path)
+    asked = []
+
+    def answer_cancel(*a, **k):
+        asked.append(a)
+        return QMessageBox.StandardButton.Cancel
+
+    def fail_dialog(*a, **k):
+        raise AssertionError("no save dialog after Cancel")
+
+    monkeypatch.setattr("pps.ui.main_window.QMessageBox.question", answer_cancel)
+    monkeypatch.setattr("pps.ui.main_window.QFileDialog.getSaveFileName", fail_dialog)
+
+    main_window._on_export_pdf()
+
+    assert len(asked) == 1
+    assert main_window._calc_worker is None  # no calculation started
+    assert main_window._export_after_calc is False
+
+
+def test_export_without_calculation_ok_calculates_then_exports(main_window, sample_ply_path, tmp_path, qtbot, monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+
+    main_window._load_file(sample_ply_path)
+    out_path = str(tmp_path / "after_calc.pdf")
+    monkeypatch.setattr(
+        "pps.ui.main_window.QMessageBox.question", lambda *a, **k: QMessageBox.StandardButton.Ok
+    )
+    monkeypatch.setattr(
+        "pps.ui.main_window.QFileDialog.getSaveFileName", lambda *a, **k: (out_path, "")
+    )
+    monkeypatch.setattr("pps.ui.main_window.QMessageBox.information", lambda *a, **k: None)
+    monkeypatch.setattr("os.startfile", lambda *a, **k: None, raising=False)
+
+    main_window._on_export_pdf()
+    assert main_window._export_after_calc is True
+
+    with qtbot.waitSignal(main_window._calc_worker.finished_ok, timeout=60000):
+        pass
+    qtbot.waitUntil(lambda: os.path.exists(out_path) and os.path.getsize(out_path) > 0, timeout=60000)
+    assert main_window._calc_result is not None
+
+
+def test_export_after_target_change_asks_to_recalculate(main_window, sample_ply_path, qtbot, monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+
+    main_window._load_file(sample_ply_path)
+    _calculate(main_window, qtbot)
+    main_window.document.set_targets(50.0, 150.0)
+
+    asked = []
+    monkeypatch.setattr(
+        "pps.ui.main_window.QMessageBox.question",
+        lambda *a, **k: asked.append(a) or QMessageBox.StandardButton.Cancel,
+    )
+    main_window._on_export_pdf()
+    assert len(asked) == 1
+
+
+def test_point_size_is_remembered_across_launches(main_window, qtbot):
+    main_window.properties_dock.spin_point_size.setValue(7)
+    assert main_window._point_size == 7
+    assert main_window.settings_store.point_size == 7
+
+    relaunched = MainWindow()
+    qtbot.addWidget(relaunched)
+    assert relaunched._point_size == 7
+    assert relaunched.properties_dock.spin_point_size.value() == 7
+
+
+def test_opening_project_applies_its_point_size(main_window, sample_ply_path, tmp_path, qtbot, monkeypatch):
+    main_window._load_file(sample_ply_path)
+    main_window.properties_dock.spin_point_size.setValue(6)
+    assert main_window.document.dirty is True  # point size is part of the project
+
+    project_path = str(tmp_path / "point_size.ppsproj")
+    monkeypatch.setattr(
+        "pps.ui.main_window.QFileDialog.getSaveFileName", lambda *a, **k: (project_path, "")
+    )
+    assert main_window._on_save_project_as() is True
+
+    other = MainWindow()
+    qtbot.addWidget(other, before_close_func=lambda w: setattr(w.document, "_dirty", False))
+    other.properties_dock.spin_point_size.setValue(2)
+    other._open_project_path(project_path)
+
+    assert other._point_size == 6
+    assert other.properties_dock.spin_point_size.value() == 6
+    assert other.document.dirty is False
+    assert other.settings_store.point_size == 6  # becomes the remembered size
+    assert other.document.point_size is None  # consumed
+
+
+def test_changing_visible_clouds_invalidates_calculation(main_window, sample_ply_path, qtbot):
+    main_window._load_file(sample_ply_path)
+    dock = main_window.selection_dock
+    dock.spin_from.setValue(75)
+    dock.spin_to.setValue(125)
+    dock._on_filter_clicked()
+    dock._on_extract_segment()  # shows only the new segment
+    _calculate(main_window, qtbot)
+    assert main_window._calc_result is not None
+
+    original = main_window.document.layer_manager.original
+    main_window.document.set_layer_visible(original.id, True)
+
+    assert main_window._calc_result is None
+    assert main_window.results_dock.lbl_area.text() == "-"
+
+
+def test_renaming_a_layer_keeps_the_calculation(main_window, sample_ply_path, qtbot):
+    main_window._load_file(sample_ply_path)
+    _calculate(main_window, qtbot)
+    original = main_window.document.layer_manager.original
+
+    main_window.document._rename_layer(original.id, "Renamed")  # emits layer_changed
+
+    assert main_window._calc_result is not None

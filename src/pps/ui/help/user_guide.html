@@ -297,7 +297,7 @@
 
     <section id="warning">
       <div class="warning-box">
-        <div class="warning-head"><span class="tri">&#9888;</span><span class="text">WARNING</span></div>
+        <div class="warning-head"><span class="tri">&#9650;</span><span class="text">WARNING</span></div>
         <div class="warning-body">
           <p>To prevent serious injury and machine damage, only trained personnel should install replacement parts.</p>
           <p>Only genuine replacement parts should be used to repair Jacon machinery.</p>
@@ -314,7 +314,7 @@
       is sprayed (the <em>Pre-Scan</em>, the raw excavated rock surface) and again
       <strong>after</strong> spraying (the <em>Post-Scan</em>). The PPS System computes the
       perpendicular distance between the Post-Scan and Pre-Scan surfaces at
-      every point and writes that signed thickness value into the <code>.ply</code> file.</p>
+      every point and writes that thickness value into the <code>.ply</code> file.</p>
       <p>Jacon PPS Report does <strong>not</strong> perform that Pre-Scan/Post-Scan comparison
       itself — its job is post-processing and reporting on data that already
       carries per-point thickness. It colors the cloud by thickness, lets you
@@ -322,13 +322,6 @@
       segments, measure distances and areas, annotate findings directly on the
       model, compute summary statistics against a target thickness range, and
       produce a PDF report suitable for handing to a client or QA reviewer.</p>
-      <p>The PPS System hardware itself is a LiDAR-based system: each Pre-Scan/Post-Scan
-      pass takes about 50 seconds, with a rated measurement accuracy of ±17 mm
-      and a valid thickness measurement range of 0–300 mm at up to 10 m scanning
-      distance. Keep that 0–300 mm range in mind when reviewing results — a
-      reported thickness far outside it (see the noise note in
-      <a href="#calculate">Calculation &amp; Targets</a>) points to a scan artifact, not real
-      shotcrete.</p>
       <p>Typical end-to-end workflow:</p>
       <ol>
       <li>Open the post-processed <code>.ply</code> scan file (already carries per-point thickness from the PPS System).</li>
@@ -405,7 +398,7 @@
 
     <section id="projects">
       <h2><span class="num">4</span> Saving & Opening Projects</h2>
-      <p>Besides the source <code>.ply</code>, the application can save your entire working session — segments, notes, annotations, measurements, target range, camera position — to a <code>.ppsproj</code> project file, so you can close the app and pick up exactly where you left off.</p>
+      <p>Besides the source <code>.ply</code>, the application can save your entire working session — segments, notes, annotations, measurements, target range, camera position, point size — to a <code>.ppsproj</code> project file, so you can close the app and pick up exactly where you left off.</p>
       <table>
       <thead>
       <tr>
@@ -449,7 +442,7 @@
       <h3>Camera controls</h3>
       <p>Left-drag to orbit, right-drag or scroll to zoom, middle-drag to pan. The view-orientation buttons on the right side of the tool toolbar (<strong>Reset, Top, Bottom, Front, Back, Right, Left, Iso</strong>) snap the camera to standard viewpoints.</p>
       <h3>The six tools</h3>
-      <figure>
+      <figure style="max-width:60%;margin-left:auto;margin-right:auto;">
               <img src="images/navigation_tool_toolbar.png" alt="">
               <figcaption>
                 Tool toolbar: Navigate, Select, Distance, Area, Note, Annotation.
@@ -530,7 +523,15 @@
       <h3>Distance</h3>
       <p>Select the <strong>Distance</strong> tool, click the first point on the cloud, move the mouse to see a live preview line and running distance, then click the second point to finish. The result is attached to the nearest segment and appears in the Project tree.</p>
       <h3>Area</h3>
-      <p>Select the <strong>Area</strong> tool and draw a region the same way as a selection shape. The true surface area (not the flat projected area) is computed using Ball-Pivoting surface reconstruction (BPA) — the same method the PDF report itself uses — and is displayed on the model a few seconds after the region is closed, once the background calculation finishes.</p>
+      <p>Select the <strong>Area</strong> tool and draw a frame on the cloud the same way as a selection shape (polygon, rectangle or lasso). When the frame is closed:</p>
+      <ul>
+      <li>It <strong>snaps onto the cloud surface you are looking at</strong> — the outline is made of cloud points, so it stays attached to the cloud and rotates/zooms with it.</li>
+      <li>Only the points <strong>enclosed by that outline on that surface</strong> are measured. Surfaces hidden behind the region (for example the opposite tunnel wall) are never included, whatever the viewing angle.</li>
+      <li>The true surface area (not the flat projected area) of those points is computed using Ball-Pivoting surface reconstruction (BPA) — the same method the PDF report itself uses — and is displayed on the model a few seconds later, once the background calculation finishes.</li>
+      </ul>
+      <p>Draw the frame on the cloud itself: parts of the frame drawn on empty background are ignored, and a frame entirely off the cloud creates no measurement. Area measurements from projects saved with an older version keep their value and label but have no outline.</p>
+      <h3>Changing a measurement's color and font size</h3>
+      <p>Each Distance and Area measurement has its own color (used for its label and its line/outline) and label font size. With the <strong>Navigate</strong> tool active, right-click the measurement's label and choose <strong>Edit…</strong> — or right-click (or double-click) it in the <a href="#project-tree">Project tree</a> — then pick a color and font size. The change can be undone with <kbd>Ctrl</kbd>+<kbd>Z</kbd> and is saved in the project file.</p>
     </section>
 
     <section id="notes">
@@ -561,14 +562,19 @@
 
     <section id="project-tree">
       <h2><span class="num">9</span> The Project Tree</h2>
+      <div class="grid-2">
+      <div>
       <p>The <strong>Project</strong> dock on the left shows every segment (layer) as a top-level row, with its Notes, Annotations and measurements nested underneath as child rows. Toggling a segment's checkbox hides or shows everything nested inside it in one action.</p>
-      <figure>
+      <p>Selecting multiple rows (<kbd>Ctrl</kbd>/<kbd>Shift</kbd>-click) enables a bulk <strong>Delete</strong> action, applied as a single undo step. Notes/measurements with no owning segment (for example, after their segment was deleted) are grouped under an <strong>(Unassigned)</strong> entry rather than being lost.</p>
+      </div>
+      <figure style="margin:0;">
               <img src="images/project_tree.png" alt="">
               <figcaption>
                 Project tree, checkboxes control visibility; right-click a
         segment to Rename/Delete, or an object to Edit/Move/Hide/Delete.
               </figcaption>
             </figure>
+      </div>
       <table>
       <thead>
       <tr>
@@ -587,19 +593,19 @@
       </tr>
       <tr>
       <td>Distance / Area measurement</td>
-      <td>Hide/Show, Delete</td>
+      <td>Edit… (color and font size), Hide/Show, Delete — double-click also opens Edit…</td>
       </tr>
       </tbody>
       </table>
-      <p>Selecting multiple rows (<kbd>Ctrl</kbd>/<kbd>Shift</kbd>-click) enables a bulk <strong>Delete</strong> action, applied as a single undo step. Notes/measurements with no owning segment (for example, after their segment was deleted) are grouped under an <strong>(Unassigned)</strong> entry rather than being lost.</p>
     </section>
 
     <section id="calculate">
       <h2><span class="num">10</span> Calculation & Targets</h2>
       <div class="grid-2">
       <div>
-      <p>In the <strong>Properties</strong> dock, set <strong>Min target thickness</strong> and <strong>Max target thickness</strong> (mm) to match the design requirement. The model re-colors and the Results dock refreshes automatically about 0.5 seconds after you stop typing. Max is always kept ≥ Min automatically.</p>
-      <p>Click <strong>Calculate</strong> on the main toolbar to run the full analysis. This runs in the background so the UI stays responsive on large clouds.</p>
+      <p>In the <strong>Properties</strong> dock, set <strong>Min target thickness</strong> and <strong>Max target thickness</strong> (mm) to match the design requirement. The model re-colors automatically about 0.5 seconds after you stop typing. Max is always kept ≥ Min automatically.</p>
+      <p>Click <strong>Calculate</strong> on the main toolbar to run the full analysis of the <strong>visible</strong> clouds. This runs in the background so the UI stays responsive on large clouds.</p>
+      <p>The results belong to the targets and visible clouds they were calculated for. Changing either — editing Min/Max, or showing/hiding a cloud in the Project tree — clears the Results dock; click <strong>Calculate</strong> again (renaming or recoloring a cloud does not).</p>
       </div>
       <figure style="margin:0;">
               <img src="images/calculate_properties_dock.png" alt="">
@@ -660,7 +666,7 @@
 
     <section id="export">
       <h2><span class="num">11</span> Exporting PDF Reports</h2>
-      <p>Once <strong>Calculate</strong> has run, click <strong>Export PDF…</strong> (<kbd>Ctrl</kbd>+<kbd>E</kbd>) on the toolbar and choose where to save. The default filename is built from the parsed project name, job number, scan time and segment name (see <a href="#open-file">Opening a PLY File</a>).</p>
+      <p>Once <strong>Calculate</strong> has run, click <strong>Export PDF…</strong> (<kbd>Ctrl</kbd>+<kbd>E</kbd>) on the toolbar and choose where to save. If there are no up-to-date results — never calculated, or the targets or visible clouds changed since — a <strong>Calculation required</strong> prompt appears: <strong>OK</strong> runs Calculate and then continues straight to saving the report, <strong>Cancel</strong> stops the export. The default filename is built from the parsed project name, job number, scan time and segment name (see <a href="#open-file">Opening a PLY File</a>).</p>
       <p>The generated report includes:</p>
       <ul>
       <li>A snapshot of the current 3D view (including any visible Notes/Annotations and the color legend).</li>
@@ -679,7 +685,17 @@
 
     <section id="settings">
       <h2><span class="num">12</span> Application Settings</h2>
-      <p>Open <code>Settings → Preferences…</code> to configure:</p>
+      <div class="grid-2">
+      <div>
+      <p>Open <code>Settings → Preferences…</code> to configure theme, point size, thickness classification colors, 3D view background, report title/logo, and PDF auto-open. These preferences are stored per-user and persist across sessions and across different point cloud files.</p>
+      </div>
+      <figure style="margin:0;">
+              <img src="images/settings_dialog.png" alt="">
+              <figcaption>
+                The Settings dialog, including the PDF Export auto-open option.
+              </figcaption>
+            </figure>
+      </div>
       <table>
       <thead>
       <tr>
@@ -694,7 +710,7 @@
       </tr>
       <tr>
       <td>Point size</td>
-      <td>Default rendered point size for newly loaded/colored layers</td>
+      <td>Rendered point size. Also adjustable in the Properties dock; the last size used is remembered for the next launch, and opening a project applies the size saved in it</td>
       </tr>
       <tr>
       <td>Thickness Classification Colors</td>
@@ -718,13 +734,6 @@
       </tr>
       </tbody>
       </table>
-      <p>These preferences are stored per-user and persist across sessions and across different point cloud files.</p>
-      <figure>
-              <img src="images/settings_dialog.png" alt="">
-              <figcaption>
-                The Settings dialog, including the PDF Export auto-open option.
-              </figcaption>
-            </figure>
     </section>
 
     <section id="undo">
@@ -735,6 +744,42 @@
 
     <section id="shortcuts">
       <h2><span class="num">14</span> Keyboard Shortcuts</h2>
+      <h3>Tools</h3>
+      <table>
+      <thead>
+      <tr>
+      <th>Shortcut</th>
+      <th>Tool</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td><kbd>V</kbd> / <kbd>1</kbd></td>
+      <td>Navigate</td>
+      </tr>
+      <tr>
+      <td><kbd>S</kbd> / <kbd>2</kbd></td>
+      <td>Select</td>
+      </tr>
+      <tr>
+      <td><kbd>D</kbd> / <kbd>3</kbd></td>
+      <td>Distance</td>
+      </tr>
+      <tr>
+      <td><kbd>A</kbd> / <kbd>4</kbd></td>
+      <td>Area</td>
+      </tr>
+      <tr>
+      <td><kbd>N</kbd> / <kbd>5</kbd></td>
+      <td>Note</td>
+      </tr>
+      <tr>
+      <td><kbd>G</kbd> / <kbd>6</kbd></td>
+      <td>Annotation</td>
+      </tr>
+      </tbody>
+      </table>
+      <h3>General</h3>
       <table>
       <thead>
       <tr>
@@ -743,14 +788,6 @@
       </tr>
       </thead>
       <tbody>
-      <tr>
-      <td><kbd>1</kbd> – <kbd>6</kbd></td>
-      <td>Switch to Navigate / Select / Distance / Area / Note / Annotation</td>
-      </tr>
-      <tr>
-      <td><kbd>V</kbd> <kbd>S</kbd> <kbd>D</kbd> <kbd>A</kbd> <kbd>N</kbd> <kbd>G</kbd></td>
-      <td>Mnemonic shortcuts for the same six tools</td>
-      </tr>
       <tr>
       <td><kbd>Esc</kbd></td>
       <td>Cancel the in-progress action; press again to return to Navigate</td>
@@ -806,8 +843,8 @@
       </thead>
       <tbody>
       <tr>
-      <td>"Please run calculation first!"</td>
-      <td>Export PDF requires a completed Calculate run — click Calculate first.</td>
+      <td>"Calculation required" when exporting</td>
+      <td>The results are missing or out of date (targets or visible clouds changed). Press OK to calculate and continue the export.</td>
       </tr>
       <tr>
       <td>"Please load a PLY file first!"</td>

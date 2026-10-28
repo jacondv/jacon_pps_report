@@ -1,10 +1,13 @@
 # User Guide source
 
-This folder is the editable source for the in-app User Guide
-(`Help → User Guide`, opened from `src/pps/ui/help/user_guide.html`).
+This folder is the editable source for the in-app User Guide, available
+from `Help` as HTML (`Help → User Guide`, `src/pps/ui/help/user_guide.html`)
+and as a printable PDF (`Help → User Guide (PDF)`,
+`src/pps/ui/help/User_Guide.pdf`) — a copy of the PDF is also kept at
+`docs/manual/User_Guide.pdf` for reference outside the app.
 
-**Do not hand-edit `src/pps/ui/help/user_guide.html`** — it is generated.
-Edit the Markdown files here and rebuild.
+**Do not hand-edit `src/pps/ui/help/user_guide.html` or `User_Guide.pdf`**
+— both are generated. Edit the Markdown files here and rebuild.
 
 ## Layout
 
@@ -38,12 +41,21 @@ Edit the Markdown files here and rebuild.
   markup changes needed. Filenames are descriptive on purpose so it's
   obvious which screen each one belongs to.
 
-- `template.html` — the page shell (CSS, header, TOC wrapper). Only edit
-  this for site-wide layout/style changes.
+- `template.html` — the page shell for the in-app HTML guide (CSS, sticky
+  sidebar TOC, header). Only edit this for site-wide layout/style changes.
 
-- `build_manual.py` — reads `sections/*.md` + `template.html`, converts
-  Markdown to HTML, and writes `src/pps/ui/help/user_guide.html` plus a
-  copy of `images/` at `src/pps/ui/help/images/`.
+- `template_pdf.html` — a separate, single-column/print-friendly shell used
+  only for the PDF (no sticky sidebar — that doesn't paginate). Keep its
+  section/table/callout styling in sync with `template.html` if you change
+  one, since both render the same section content.
+
+- `build_manual.py` — reads `sections/*.md` + both templates, converts
+  Markdown to HTML, and writes:
+  - `src/pps/ui/help/user_guide.html` + `src/pps/ui/help/images/` (HTML guide)
+  - `src/pps/ui/help/User_Guide.pdf` + a copy at `docs/manual/User_Guide.pdf`
+    (rendered via the `wkhtmltopdf` binary already vendored at
+    `src/pps/report/packages/wkhtmltox/` for PDF report export; the PDF step
+    is skipped with a warning if that binary isn't present)
 
 ## Rebuilding
 
@@ -53,12 +65,11 @@ python docs/manual/build_manual.py
 
 Requires the `markdown` package (`pip install markdown`, already listed
 in `requirements.txt` as a dev-only dependency — it is not imported by
-the app itself, only by this build script).
+the app itself, only by this build script) and `pdfkit` (already a runtime
+dependency, used for PDF report export too).
 
-## Regenerating screenshots
+## Updating screenshots
 
-The six screenshots under `images/` were captured from the previous UI
-and need retaking against the current interface. Capture each one at a
-reasonable window size, save as PNG with the same filename it already
-has (or update the `image:` field in the relevant section if you rename
-it), and rerun the build script above.
+To refresh a screenshot, replace the PNG file in `images/` with the same
+filename (or update the `image:` field in the relevant section if you
+rename it), then rerun the build script above.

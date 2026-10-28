@@ -17,7 +17,8 @@ class DistanceMeasurement:
     p2: Point3D
     layer_id: Optional[str] = None  # which segment this belongs to, for the Project tree
     label_offset_px: Tuple[int, int] = (20, 20)
-    color: str = "#4cc9f0"
+    color: str = "#4cc9f0"  # label, line/outline
+    font_size: int = 14  # label text
     visible: bool = True
     id: str = field(default_factory=lambda: uuid.uuid4().hex)
 
@@ -33,12 +34,16 @@ class DistanceMeasurement:
 
 @dataclass
 class AreaMeasurement:
-    boundary_px_at_creation: List[Tuple[float, float]]
-    sources: List[SourceRef]
-    centroid: Point3D
+    # Closed ring of cloud points the drawn frame was draped onto — world
+    # coordinates, so it is drawn in the 3D scene and follows the camera.
+    # Empty for measurements from projects saved before outlines were 3D.
+    outline: List[Point3D]
+    sources: List[SourceRef]  # the enclosed points the area was computed from
+    centroid: Point3D  # label anchor, on the cloud surface
     area_m2: Optional[float] = None  # None while a background calc is running
     layer_id: Optional[str] = None  # which segment this belongs to, for the Project tree
     label_offset_px: Tuple[int, int] = (20, 20)
-    color: str = "#4cc9f0"
+    color: str = "#4cc9f0"  # label, line/outline
+    font_size: int = 14  # label text
     visible: bool = True
     id: str = field(default_factory=lambda: uuid.uuid4().hex)

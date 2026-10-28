@@ -5,8 +5,9 @@ labels — added in later phases).
 """
 
 from pps.app import qt_env  # noqa: F401  (sets QT_API before Qt/pyvista import)
+from pps.render import vtk_setup  # noqa: F401  (VTK OpenGL/font/interactor factories)
 
-import vtk
+from vtkmodules.vtkRenderingCore import vtkRenderer
 from PySide6.QtWidgets import QVBoxLayout, QWidget
 from pyvistaqt import QtInteractor
 
@@ -32,7 +33,7 @@ class Viewport(QWidget):
         self.plotter.add_axes()
         self.plotter.enable_rubber_band_style()
 
-        self.overlay_renderer = vtk.vtkRenderer()
+        self.overlay_renderer = vtkRenderer()
         self.overlay_renderer.SetLayer(1)
         self.overlay_renderer.InteractiveOff()
         self.plotter.ren_win.SetNumberOfLayers(2)
