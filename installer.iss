@@ -64,8 +64,8 @@ SetupIconFile=src\pps\ui\icons\app.ico
 WizardImageFile=installer\wizard_large.bmp,installer\wizard_large@2x.bmp
 WizardSmallImageFile=installer\wizard_small.bmp,installer\wizard_small@2x.bmp
 
-; Installing to Program Files and registering the uninstaller for all users
-; require admin rights.
+; Installing to Program Files, registering the uninstaller for all users and
+; the Defender exclusion task below all require admin rights.
 PrivilegesRequired=admin
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
@@ -78,6 +78,11 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription: "Additional shortcuts:"
+; Checked by default: the app ships to customers' own PCs, where Windows
+; Defender otherwise scans every bundled DLL on first launch (slow start).
+; On company devices managed by Intune with Tamper Protection, a locally
+; added exclusion is overridden by policy — there IT must add it centrally.
+Name: "defenderexclusion"; Description: "Add a Windows Defender exclusion for the install folder (recommended: much faster first start)"; GroupDescription: "Startup performance:"
 
 [InstallDelete]
 ; Upgrading over an older version: remove the old bundle first, otherwise
@@ -94,11 +99,10 @@ Name: "{group}\Uninstall {#MyAppName}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Run]
+Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -Command ""Add-MpPreference -ExclusionPath '{app}'"""; StatusMsg: "Adding Windows Defender exclusion…"; Tasks: defenderexclusion; Flags: runhidden
 Filename: "{app}\{#MyAppExeName}"; Description: "Launch {#MyAppName}"; Flags: nowait postinstall skipifsilent
 
 [UninstallRun]
-; Versions up to 3.0 offered an optional Windows Defender exclusion for the
-; install folder. It's no longer offered (Defender rescans after every
-; reboot regardless), but remove it if an older version added it. Silently
-; continues if it was never added.
+; Remove the Defender exclusion added by the "defenderexclusion" task (by this
+; or an earlier version). Silently continues if it was never added.
 Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -Command ""Remove-MpPreference -ExclusionPath '{app}' -ErrorAction SilentlyContinue"""; Flags: runhidden; RunOnceId: "RemoveDefenderExclusion"
