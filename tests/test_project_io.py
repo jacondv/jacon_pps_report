@@ -169,3 +169,21 @@ def test_resolve_ply_path_falls_back_to_relative(tmp_path):
 
     resolved = _resolve_ply_path(project, str(project_path))
     assert os.path.normpath(resolved) == os.path.normpath(str(ply_path))
+
+
+def test_point_size_round_trips_and_is_optional(sample_ply_path, tmp_path, qtbot):
+    doc = _build_document_with_content(sample_ply_path)
+
+    with_size = str(tmp_path / "with_point_size.ppsproj")
+    save_project(doc, with_size, point_size=7)
+    loaded = Document()
+    load_project(loaded, with_size, load_ply)
+    assert loaded.point_size == 7
+
+    # Projects saved without a point size (incl. ones from older versions)
+    # leave it None so the app keeps the user's current setting.
+    without_size = str(tmp_path / "without_point_size.ppsproj")
+    save_project(doc, without_size)
+    loaded = Document()
+    load_project(loaded, without_size, load_ply)
+    assert loaded.point_size is None

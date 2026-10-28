@@ -10,7 +10,7 @@ import platform
 import subprocess
 import tempfile
 
-from PySide6.QtCore import QSettings, Qt
+from PySide6.QtCore import QSettings, Qt, QTimer
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import QApplication, QFileDialog, QMainWindow, QMessageBox
 
@@ -73,6 +73,10 @@ class MainWindow(QMainWindow):
         self._point_size = self.settings_store.point_size
         self._calc_result = None
         self._thickness_dist = None
+        # Export PDF asked to calculate first; continue the export once the
+        # calculation finishes.
+        self._export_after_calc = False
+        self._calc_worker = None
         self._area_workers = []  # keep QThreads alive while running
         self.current_project_path = None
 
@@ -347,6 +351,13 @@ class MainWindow(QMainWindow):
         d.dirty_changed.connect(self._on_dirty_changed)
 
     def _on_document_reset(self) -> None:
+        if self.document.point_size is not None:
+            # A loaded project brings its own point size; it also becomes
+            # the remembered one for the next launch.
+            self._point_size = self.document.point_size
+            self.document.point_size = None
+            self.properties_dock.set_point_size_silently(self._point_size)
+            self.settings_store.remember_point_size(self._point_size)
         self.layer_renderer.clear()
         self.note_renderer.clear()
         self.measurement_renderer.clear()
@@ -401,6 +412,7 @@ class MainWindow(QMainWindow):
             self.viewport.render()
 
     def _on_targets_changed(self, target_min: float, target_max: float) -> None:
+        self._invalidate_calculation()
         for layer in self.document.layer_manager.layers:
             self.layer_renderer.sync(layer, target_min, target_max, self._point_size)
         self.color_legend.update(
@@ -411,8 +423,21 @@ class MainWindow(QMainWindow):
         )
         self.viewport.render()
 
+    def _invalidate_calculation(self) -> None:
+        """Results depend on the targets; once they change the shown numbers
+        no longer match, so they must not reach a report."""
+        if self._calc_result is None:
+            return
+        self._calc_result = None
+        self._thickness_dist = None
+        self.results_dock.clear_result()
+        self.statusBar().showMessage("Target thickness changed — run Calculate again", 8000)
+
     def _on_point_size_changed(self, size: int) -> None:
         self._point_size = size
+        self.settings_store.remember_point_size(size)
+        if self.document.layer_manager.original is not None:
+            self.document.mark_dirty()  # point size is saved in the project
         for layer in self.document.layer_manager.layers:
             self.layer_renderer.sync(layer, self.document.target_min, self.document.target_max, size)
         self.viewport.render()
@@ -577,7 +602,9 @@ class MainWindow(QMainWindow):
     def _save_project_to(self, filepath: str) -> None:
         try:
             camera_state = camera.get_camera_state(self.viewport.plotter)
-            save_project(self.document, filepath, camera_state=camera_state)
+            save_project(
+                self.document, filepath, camera_state=camera_state, point_size=self._point_size
+            )
             self.current_project_path = filepath
             self._add_recent_project(filepath)
             self._update_window_title()
@@ -665,7 +692,10 @@ class MainWindow(QMainWindow):
 
         self._sync_layer_renderer_colors()
         self.viewport.set_background(self.settings_store.background_color)
-        self._point_size = self.settings_store.point_size
+        if self.settings_store.point_size != self._point_size:
+            self._point_size = self.settings_store.point_size
+            if self.document.layer_manager.original is not None:
+                self.document.mark_dirty()  # point size is saved in the project
         for layer in self.document.layer_manager.layers:
             self.layer_renderer.sync(layer, self.document.target_min, self.document.target_max, self._point_size)
         self.color_legend.update(
@@ -703,11 +733,12 @@ class MainWindow(QMainWindow):
         self.selection_dock.set_icon_color(color)
 
     # ------------------------------------------------------------------ Calculate
-    def _on_calculate(self) -> None:
+    def _on_calculate(self) -> bool:
+        """Start the calculation; returns False if it couldn't start."""
         points, distances = self.document.layer_manager.combined_visible()
         if len(points) == 0:
             QMessageBox.warning(self, "Warning", "Please check one or more layers!")
-            return
+            return False
 
         # The worker only ever reports 10% then 100% (run_analysis isn't
         # instrumented for finer-grained progress), so a determinate bar
@@ -726,6 +757,7 @@ class MainWindow(QMainWindow):
         self._calc_worker.finished_ok.connect(self._on_calc_done)
         self._calc_worker.failed.connect(self._on_calc_failed)
         self._calc_worker.start()
+        return True
 
     def _end_calc_busy_state(self) -> None:
         self.results_dock.set_busy(False)
@@ -734,13 +766,24 @@ class MainWindow(QMainWindow):
         QApplication.restoreOverrideCursor()
 
     def _on_calc_done(self, calc, dist) -> None:
+        self._end_calc_busy_state()
+        worker = self._calc_worker
+        if (worker.target_min, worker.target_max) != (self.document.target_min, self.document.target_max):
+            # Targets were edited while this ran — the result is already stale.
+            self._export_after_calc = False
+            self.statusBar().showMessage("Target thickness changed during calculation — run Calculate again", 8000)
+            return
         self._calc_result = calc
         self._thickness_dist = dist
         self.results_dock.show_result(calc, dist)
-        self._end_calc_busy_state()
         self.statusBar().showMessage("Completed calculation")
+        if self._export_after_calc:
+            self._export_after_calc = False
+            # Let the results dock repaint before the save dialog opens.
+            QTimer.singleShot(0, self._on_export_pdf)
 
     def _on_calc_failed(self, message: str) -> None:
+        self._export_after_calc = False
         self._end_calc_busy_state()
         QMessageBox.critical(
             self, "Calculation Error",
@@ -751,12 +794,28 @@ class MainWindow(QMainWindow):
 
     # ------------------------------------------------------------------ Export PDF
     def _on_export_pdf(self) -> None:
-        if self._calc_result is None:
-            QMessageBox.warning(self, "Warning", "Please run calculation first!")
-            return
         info = self.document.project_info
         if info is None:
             QMessageBox.warning(self, "Warning", "Please load a PLY file first!")
+            return
+        if self._calc_worker is not None and self._calc_worker.isRunning():
+            self._export_after_calc = True
+            self.statusBar().showMessage("Calculating… the report export will start when it finishes")
+            return
+        if self._calc_result is None:
+            # Never calculated, or the targets changed since — the report
+            # must not show numbers that don't match the current targets.
+            answer = QMessageBox.question(
+                self, "Calculation required",
+                "The results are missing or out of date (the target thickness "
+                "changed).\n\nPress OK to calculate now — the report export "
+                "continues when the calculation finishes.",
+                QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel,
+                QMessageBox.StandardButton.Ok,
+            )
+            if answer != QMessageBox.StandardButton.Ok:
+                return
+            self._export_after_calc = self._on_calculate()
             return
 
         visible_layers = self.document.layer_manager.visible_layers()

@@ -333,3 +333,118 @@ def test_close_with_unsaved_changes_discard_proceeds(main_window, sample_ply_pat
     event = QCloseEvent()
     main_window.closeEvent(event)
     assert event.isAccepted()
+
+
+def _calculate(main_window, qtbot):
+    assert main_window._on_calculate() is True
+    with qtbot.waitSignal(main_window._calc_worker.finished_ok, timeout=60000):
+        pass
+
+
+def test_changing_targets_invalidates_calculation(main_window, sample_ply_path, qtbot):
+    main_window._load_file(sample_ply_path)
+    _calculate(main_window, qtbot)
+    assert main_window._calc_result is not None
+    assert main_window.results_dock.lbl_area.text() != "-"
+
+    main_window.document.set_targets(50.0, 150.0)
+
+    assert main_window._calc_result is None
+    assert main_window._thickness_dist is None
+    assert main_window.results_dock.lbl_area.text() == "-"
+
+
+def test_export_without_calculation_cancel_does_nothing(main_window, sample_ply_path, monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+
+    main_window._load_file(sample_ply_path)
+    asked = []
+
+    def answer_cancel(*a, **k):
+        asked.append(a)
+        return QMessageBox.StandardButton.Cancel
+
+    def fail_dialog(*a, **k):
+        raise AssertionError("no save dialog after Cancel")
+
+    monkeypatch.setattr("pps.ui.main_window.QMessageBox.question", answer_cancel)
+    monkeypatch.setattr("pps.ui.main_window.QFileDialog.getSaveFileName", fail_dialog)
+
+    main_window._on_export_pdf()
+
+    assert len(asked) == 1
+    assert main_window._calc_worker is None  # no calculation started
+    assert main_window._export_after_calc is False
+
+
+def test_export_without_calculation_ok_calculates_then_exports(main_window, sample_ply_path, tmp_path, qtbot, monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+
+    main_window._load_file(sample_ply_path)
+    out_path = str(tmp_path / "after_calc.pdf")
+    monkeypatch.setattr(
+        "pps.ui.main_window.QMessageBox.question", lambda *a, **k: QMessageBox.StandardButton.Ok
+    )
+    monkeypatch.setattr(
+        "pps.ui.main_window.QFileDialog.getSaveFileName", lambda *a, **k: (out_path, "")
+    )
+    monkeypatch.setattr("pps.ui.main_window.QMessageBox.information", lambda *a, **k: None)
+    monkeypatch.setattr("os.startfile", lambda *a, **k: None, raising=False)
+
+    main_window._on_export_pdf()
+    assert main_window._export_after_calc is True
+
+    with qtbot.waitSignal(main_window._calc_worker.finished_ok, timeout=60000):
+        pass
+    qtbot.waitUntil(lambda: os.path.exists(out_path) and os.path.getsize(out_path) > 0, timeout=60000)
+    assert main_window._calc_result is not None
+
+
+def test_export_after_target_change_asks_to_recalculate(main_window, sample_ply_path, qtbot, monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+
+    main_window._load_file(sample_ply_path)
+    _calculate(main_window, qtbot)
+    main_window.document.set_targets(50.0, 150.0)
+
+    asked = []
+    monkeypatch.setattr(
+        "pps.ui.main_window.QMessageBox.question",
+        lambda *a, **k: asked.append(a) or QMessageBox.StandardButton.Cancel,
+    )
+    main_window._on_export_pdf()
+    assert len(asked) == 1
+
+
+def test_point_size_is_remembered_across_launches(main_window, qtbot):
+    main_window.properties_dock.spin_point_size.setValue(7)
+    assert main_window._point_size == 7
+    assert main_window.settings_store.point_size == 7
+
+    relaunched = MainWindow()
+    qtbot.addWidget(relaunched)
+    assert relaunched._point_size == 7
+    assert relaunched.properties_dock.spin_point_size.value() == 7
+
+
+def test_opening_project_applies_its_point_size(main_window, sample_ply_path, tmp_path, qtbot, monkeypatch):
+    main_window._load_file(sample_ply_path)
+    main_window.properties_dock.spin_point_size.setValue(6)
+    assert main_window.document.dirty is True  # point size is part of the project
+
+    project_path = str(tmp_path / "point_size.ppsproj")
+    monkeypatch.setattr(
+        "pps.ui.main_window.QFileDialog.getSaveFileName", lambda *a, **k: (project_path, "")
+    )
+    assert main_window._on_save_project_as() is True
+
+    other = MainWindow()
+    qtbot.addWidget(other, before_close_func=lambda w: setattr(w.document, "_dirty", False))
+    other.properties_dock.spin_point_size.setValue(2)
+    other._open_project_path(project_path)
+
+    assert other._point_size == 6
+    assert other.properties_dock.spin_point_size.value() == 6
+    assert other.document.dirty is False
+    assert other.settings_store.point_size == 6  # becomes the remembered size
+    assert other.document.point_size is None  # consumed
