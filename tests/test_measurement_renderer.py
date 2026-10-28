@@ -1,5 +1,5 @@
 import numpy as np
-import vtk
+from vtkmodules.vtkRenderingCore import vtkRenderWindow, vtkRenderer
 
 from pps.core.layers import SourceRef
 from pps.render.measurement_renderer import MeasurementRenderer
@@ -12,8 +12,8 @@ class FakePlotter:
     VTK renderer + render window, no Qt widget needed."""
 
     def __init__(self):
-        self.renderer = vtk.vtkRenderer()
-        self.ren_win = vtk.vtkRenderWindow()
+        self.renderer = vtkRenderer()
+        self.ren_win = vtkRenderWindow()
         self.ren_win.SetOffScreenRendering(1)
         self.ren_win.AddRenderer(self.renderer)
         self.ren_win.SetSize(400, 300)
@@ -21,7 +21,7 @@ class FakePlotter:
 
 def make_renderer():
     plotter = FakePlotter()
-    overlay = Overlay(vtk.vtkRenderer())
+    overlay = Overlay(vtkRenderer())
     return MeasurementRenderer(plotter, overlay)
 
 

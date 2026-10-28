@@ -6,7 +6,7 @@ the Qt event queue for determinism), with two trivial recording tools
 instead of the real ones.
 """
 
-import vtk
+from vtkmodules.vtkRenderingCore import vtkActor2D, vtkRenderer
 from PySide6.QtCore import QEvent, QPointF, Qt
 from PySide6.QtGui import QKeyEvent, QMouseEvent
 from PySide6.QtWidgets import QWidget
@@ -28,7 +28,7 @@ class RecordingTool(Tool):
 
     def on_activate(self):
         self.activate_count += 1
-        self.scratch.add(vtk.vtkActor2D())  # pretend we drew something
+        self.scratch.add(vtkActor2D())  # pretend we drew something
 
     def on_deactivate(self):
         self.deactivate_count += 1
@@ -53,7 +53,7 @@ def make_manager(widget, tools):
         from pps.render.overlay import Overlay
 
         if "overlay" not in ctx_holders:
-            ctx_holders["overlay"] = Overlay(vtk.vtkRenderer())
+            ctx_holders["overlay"] = Overlay(vtkRenderer())
         from pps.tools.base import ToolContext
 
         return ToolContext(

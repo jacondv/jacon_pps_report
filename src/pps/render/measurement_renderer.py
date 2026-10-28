@@ -8,7 +8,8 @@ keeping this a pure "data -> actors" mapper like LayerRenderer.
 from typing import Dict, Iterable, Tuple, Union
 
 import numpy as np
-import vtk
+from vtkmodules.vtkFiltersSources import vtkLineSource
+from vtkmodules.vtkRenderingCore import vtkActor, vtkActor2D, vtkPolyDataMapper
 
 from pps.render.actors2d import polyline_actor
 from pps.render.labels import AnchoredLabel, hex_to_rgb, layer_visible as _layer_visible
@@ -22,8 +23,8 @@ class MeasurementRenderer:
         self._plotter = plotter
         self._overlay = overlay
         self._labels: Dict[str, AnchoredLabel] = {}
-        self._line_actors: Dict[str, vtk.vtkActor] = {}
-        self._boundary_actors: Dict[str, vtk.vtkActor2D] = {}
+        self._line_actors: Dict[str, vtkActor] = {}
+        self._boundary_actors: Dict[str, vtkActor2D] = {}
 
     def sync_all(self, measurements: Iterable[Measurement], layer_manager=None) -> None:
         measurements = list(measurements)
@@ -81,12 +82,12 @@ class MeasurementRenderer:
     # ------------------------------------------------------------------ distance
     def _sync_distance(self, measurement: DistanceMeasurement, layer_visible: bool) -> None:
         visible = measurement.visible and layer_visible
-        line_source = vtk.vtkLineSource()
+        line_source = vtkLineSource()
         line_source.SetPoint1(*measurement.p1)
         line_source.SetPoint2(*measurement.p2)
-        mapper = vtk.vtkPolyDataMapper()
+        mapper = vtkPolyDataMapper()
         mapper.SetInputConnection(line_source.GetOutputPort())
-        actor = vtk.vtkActor()
+        actor = vtkActor()
         actor.SetMapper(mapper)
         actor.GetProperty().SetColor(*hex_to_rgb(measurement.color))
         actor.GetProperty().SetLineWidth(2.0)

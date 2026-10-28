@@ -9,7 +9,7 @@ behaves identically to before.
 from typing import List, Optional, Tuple
 
 import numpy as np
-import vtk
+from vtkmodules.vtkRenderingCore import vtkPointPicker
 from matplotlib.path import Path
 
 
@@ -80,7 +80,7 @@ def pick_nearest_point_3d(
 
     Returns None if no point was within tolerance.
     """
-    picker = vtk.vtkPointPicker()
+    picker = vtkPointPicker()
     picker.SetTolerance(tolerance)
     picker.Pick(x, y, 0, plotter.renderer)
     if picker.GetPointId() < 0:

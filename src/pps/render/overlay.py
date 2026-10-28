@@ -8,7 +8,7 @@ tools/base.py does this unconditionally, so a tool can never leak an actor
 onto the screen after it stops being active.
 """
 
-import vtk
+from vtkmodules.vtkRenderingCore import vtkTextActor
 
 
 class ScratchGroup:
@@ -42,7 +42,7 @@ class Overlay:
     def __init__(self, renderer):
         self.renderer = renderer
 
-        self._hud = vtk.vtkTextActor()
+        self._hud = vtkTextActor()
         self._hud.SetPosition(10, 10)
         prop = self._hud.GetTextProperty()
         prop.SetFontSize(13)

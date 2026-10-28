@@ -1,4 +1,4 @@
-import vtk
+from vtkmodules.vtkRenderingCore import vtkRenderWindow, vtkRenderer
 
 from pps.render.note_renderer import NoteRenderer
 from pps.render.overlay import Overlay
@@ -7,8 +7,8 @@ from pps.scene.annotations import NoteAnnotation
 
 class FakePlotter:
     def __init__(self):
-        self.renderer = vtk.vtkRenderer()
-        self.ren_win = vtk.vtkRenderWindow()
+        self.renderer = vtkRenderer()
+        self.ren_win = vtkRenderWindow()
         self.ren_win.SetOffScreenRendering(1)
         self.ren_win.AddRenderer(self.renderer)
         self.ren_win.SetSize(400, 300)
@@ -16,7 +16,7 @@ class FakePlotter:
 
 def make_renderer():
     plotter = FakePlotter()
-    overlay = Overlay(vtk.vtkRenderer())
+    overlay = Overlay(vtkRenderer())
     return NoteRenderer(plotter, overlay)
 
 

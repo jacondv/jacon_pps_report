@@ -4,22 +4,24 @@ measurement preview lines, ...)."""
 
 from typing import List, Tuple
 
-import vtk
+from vtkmodules.vtkCommonCore import vtkPoints
+from vtkmodules.vtkCommonDataModel import vtkCellArray, vtkLine, vtkPolyData
+from vtkmodules.vtkRenderingCore import vtkActor2D, vtkPolyDataMapper2D
 
 Point2D = Tuple[float, float]
 
 
-def vtk_points_2d(coords: List[Point2D]) -> vtk.vtkPoints:
-    pts = vtk.vtkPoints()
+def vtk_points_2d(coords: List[Point2D]) -> vtkPoints:
+    pts = vtkPoints()
     for x, y in coords:
         pts.InsertNextPoint(float(x), float(y), 0.0)
     return pts
 
 
-def actor2d(poly, rgb, line_width=None, point_size=None, opacity=1.0, stipple=None) -> vtk.vtkActor2D:
-    mapper = vtk.vtkPolyDataMapper2D()
+def actor2d(poly, rgb, line_width=None, point_size=None, opacity=1.0, stipple=None) -> vtkActor2D:
+    mapper = vtkPolyDataMapper2D()
     mapper.SetInputData(poly)
-    actor = vtk.vtkActor2D()
+    actor = vtkActor2D()
     actor.SetMapper(mapper)
     prop = actor.GetProperty()
     prop.SetColor(*rgb)
@@ -33,29 +35,29 @@ def actor2d(poly, rgb, line_width=None, point_size=None, opacity=1.0, stipple=No
     return actor
 
 
-def polyline_actor(coords: List[Point2D], closed: bool, **style) -> vtk.vtkActor2D:
+def polyline_actor(coords: List[Point2D], closed: bool, **style) -> vtkActor2D:
     n = len(coords)
     pts = vtk_points_2d(coords)
-    lines = vtk.vtkCellArray()
+    lines = vtkCellArray()
     limit = n if closed else n - 1
     for i in range(limit):
-        line = vtk.vtkLine()
+        line = vtkLine()
         line.GetPointIds().SetId(0, i)
         line.GetPointIds().SetId(1, (i + 1) % n)
         lines.InsertNextCell(line)
-    poly = vtk.vtkPolyData()
+    poly = vtkPolyData()
     poly.SetPoints(pts)
     poly.SetLines(lines)
     return actor2d(poly, **style)
 
 
-def points_actor(coords: List[Point2D], **style) -> vtk.vtkActor2D:
+def points_actor(coords: List[Point2D], **style) -> vtkActor2D:
     pts = vtk_points_2d(coords)
-    verts = vtk.vtkCellArray()
+    verts = vtkCellArray()
     for i in range(len(coords)):
         verts.InsertNextCell(1)
         verts.InsertCellPoint(i)
-    poly = vtk.vtkPolyData()
+    poly = vtkPolyData()
     poly.SetPoints(pts)
     poly.SetVerts(verts)
     return actor2d(poly, **style)

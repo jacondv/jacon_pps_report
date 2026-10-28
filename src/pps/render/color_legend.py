@@ -12,7 +12,8 @@ right edge in normalized viewport coordinates so it stays put across
 window resizes without recomputing.
 """
 
-import vtk
+from vtkmodules.vtkCommonDataModel import vtkCellArray, vtkLine, vtkPolyData
+from vtkmodules.vtkRenderingCore import vtkActor2D, vtkCoordinate, vtkPolyDataMapper2D, vtkTextActor
 
 from pps.render.actors2d import vtk_points_2d
 
@@ -27,27 +28,27 @@ _BORDER_COLOR = (0.85, 0.85, 0.85)  # light: reads well against the default dark
 _BORDER_WIDTH = 1.5
 
 
-def _normalized_viewport_coord() -> vtk.vtkCoordinate:
-    coord = vtk.vtkCoordinate()
+def _normalized_viewport_coord() -> vtkCoordinate:
+    coord = vtkCoordinate()
     coord.SetCoordinateSystemToNormalizedViewport()
     return coord
 
 
 def _quad_actor() -> tuple:
     points = vtk_points_2d([(0, 0)] * 4)
-    quad = vtk.vtkCellArray()
+    quad = vtkCellArray()
     quad.InsertNextCell(4)
     for i in range(4):
         quad.InsertCellPoint(i)
-    poly = vtk.vtkPolyData()
+    poly = vtkPolyData()
     poly.SetPoints(points)
     poly.SetPolys(quad)
 
-    mapper = vtk.vtkPolyDataMapper2D()
+    mapper = vtkPolyDataMapper2D()
     mapper.SetInputData(poly)
     mapper.SetTransformCoordinate(_normalized_viewport_coord())
 
-    actor = vtk.vtkActor2D()
+    actor = vtkActor2D()
     actor.SetMapper(mapper)
     return actor, points
 
@@ -56,22 +57,22 @@ def _line_actor(n_points: int, closed: bool = False) -> tuple:
     """An open or closed polyline in normalized-viewport space, used for
     the border outline and tick marks — solid, thin, dark, professional."""
     points = vtk_points_2d([(0, 0)] * n_points)
-    lines = vtk.vtkCellArray()
+    lines = vtkCellArray()
     limit = n_points if closed else n_points - 1
     for i in range(limit):
-        line = vtk.vtkLine()
+        line = vtkLine()
         line.GetPointIds().SetId(0, i)
         line.GetPointIds().SetId(1, (i + 1) % n_points)
         lines.InsertNextCell(line)
-    poly = vtk.vtkPolyData()
+    poly = vtkPolyData()
     poly.SetPoints(points)
     poly.SetLines(lines)
 
-    mapper = vtk.vtkPolyDataMapper2D()
+    mapper = vtkPolyDataMapper2D()
     mapper.SetInputData(poly)
     mapper.SetTransformCoordinate(_normalized_viewport_coord())
 
-    actor = vtk.vtkActor2D()
+    actor = vtkActor2D()
     actor.SetMapper(mapper)
     prop = actor.GetProperty()
     prop.SetColor(*_BORDER_COLOR)
@@ -79,10 +80,10 @@ def _line_actor(n_points: int, closed: bool = False) -> tuple:
     return actor, points
 
 
-def _label_actor() -> vtk.vtkTextActor:
+def _label_actor() -> vtkTextActor:
     """Black, bold text on a translucent white backing plate so it stays
     legible over any 3D-view background color the user picks."""
-    actor = vtk.vtkTextActor()
+    actor = vtkTextActor()
     prop = actor.GetTextProperty()
     prop.SetFontSize(_LABEL_FONT_SIZE)
     prop.SetColor(0.0, 0.0, 0.0)
