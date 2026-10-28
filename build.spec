@@ -104,6 +104,14 @@ a = Analysis(
     cipher=block_cipher,
 )
 
+# jedi is only here because `import open3d` imports IPython. Its type stubs
+# (jedi/third_party: typeshed + django-stubs, ~5,500 .pyi files) are for code
+# completion, which the app never does; newer hook versions collect them.
+a.datas = [
+    entry for entry in a.datas
+    if not entry[0].replace("\\", "/").startswith("jedi/third_party/")
+]
+
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
 exe = EXE(

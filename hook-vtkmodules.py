@@ -5,7 +5,8 @@ Bundle only the VTK modules the app actually imports. Collecting every
 vtkmodules submodule pulled in ~150 extension modules plus their DLLs
 (VTK-m/viskores, volume rendering, IO readers, web, ...), hundreds of MB the
 app never loads. The list was recorded from a full test-suite run plus a real
-app session (docs/dep-slimming/used-modules-*.txt, PLAN.md Phase 4). If a new
+app session, in both the dev venv and a clean venv with newer
+package versions (docs/dep-slimming/used-modules-*.txt, PLAN.md Phase 4). If a new
 feature uses another VTK class, add its module here — a missing one fails
 with ImportError only when that code path runs in the frozen app.
 """
@@ -15,9 +16,21 @@ datas = collect_data_files("vtkmodules")
 hiddenimports = [
     "vtkmodules",
     "vtkmodules.numpy_interface",
+    "vtkmodules.numpy_interface._vtk_array_mixin",
+    "vtkmodules.numpy_interface.array_overrides",
     "vtkmodules.numpy_interface.dataset_adapter",
+    "vtkmodules.numpy_interface.vtk_affine_array",
+    "vtkmodules.numpy_interface.vtk_aos_array",
+    "vtkmodules.numpy_interface.vtk_composite_array",
+    "vtkmodules.numpy_interface.vtk_constant_array",
+    "vtkmodules.numpy_interface.vtk_implicit_array",
+    "vtkmodules.numpy_interface.vtk_indexed_array",
+    "vtkmodules.numpy_interface.vtk_soa_array",
+    "vtkmodules.numpy_interface.vtk_strided_array",
+    "vtkmodules.numpy_interface.vtk_structured_point_array",
     "vtkmodules.qt",
     "vtkmodules.util",
+    "vtkmodules.util.data_array_selection",
     "vtkmodules.util.data_model",
     "vtkmodules.util.execution_model",
     "vtkmodules.util.numpy_support",

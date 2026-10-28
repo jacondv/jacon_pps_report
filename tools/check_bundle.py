@@ -8,7 +8,11 @@ build: pure-Python modules inside the exe's PYZ archive, extension modules
 (.pyd) and built-in modules. Test-only modules are ignored.
 
 Usage (repo root):
-    .venv\\Scripts\\python tools\\check_bundle.py "dist\\Jacon PPS Report"
+    .venv\\Scripts\\python tools\\check_bundle.py "dist\\Jacon PPS Report" [used-modules.txt ...]
+
+Run it with the venv the build was made from. If that venv's package versions
+differ from the ones the committed lists were recorded with, record fresh
+lists in it (PPS_DUMP_MODULES) and pass them as extra arguments.
 """
 
 import glob
@@ -73,12 +77,12 @@ def _has_own_file(module_name):
 
 
 def main() -> int:
-    if len(sys.argv) != 2:
+    if len(sys.argv) < 2:
         print(__doc__)
         return 2
     dist_dir = sys.argv[1]
     used = set()
-    for path in USED_LISTS:
+    for path in sys.argv[2:] or USED_LISTS:
         with open(path, encoding="utf-8") as f:
             used.update(line.strip() for line in f if line.strip())
     used = {m for m in used if not m.startswith(TEST_ONLY_PREFIXES)}
