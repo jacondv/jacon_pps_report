@@ -194,7 +194,10 @@ viewer 3D không chạy. Không có tag `slim/phase-3-done`.
   `vtkWebCore`, `vtkAcceleratorsVTKm*`) bằng cách lọc `a.binaries`; mỗi DLL bị loại phải qua
   CHECKLIST trên exe. Không dùng wildcard rộng.
 
-### 4.4 Qt
+### 4.4 Qt — **bỏ qua (2026-10-28)**
+Chỉ tiết kiệm ~20 MB (translations 6.7 MB; Qt6Pdf/Qml/Quick do plugin kéo theo) mà có rủi ro làm hỏng
+plugin platform/imageformats. Không làm. Nội dung gốc giữ lại để tham khảo:
+
 - Giữ QtCore, QtGui, QtWidgets, QtSvg, QtOpenGL/QtOpenGLWidgets (pyvistaqt), các module có trong
   `used-modules.txt`. Exclude QtWebEngine*, Qt3D*, QtQuick*, QtQml*, QtMultimedia*, QtCharts,
   QtDataVisualization, QtPdf*, QtBluetooth, QtSerialPort, QtSql, QtTest (QtNetwork chỉ khi không
@@ -245,7 +248,7 @@ Xuất PDF từ sample với cùng thông số như bản baseline → **mọi s
 | 1 | 2026-10-28 | 900 | 3285 | **62** | 2.71 (run 1 ngay sau build: 12.15) | chờ đo | | 132 passed, 71 s | Import `main_window` từ source 1.84 s (từ 2.41). Exe chưa kiểm CHECKLIST thủ công |
 | 2 | 2026-10-28 | — (chưa build) | | 62 | từ source: QApplication → splash 1.2 s (chi phí hiện cửa sổ Qt đầu tiên), → MainWindow shown 2.9 s | chờ đo | open3d preload 2.32 s ở nền | 136 passed, 69 s | jinja2/pdfkit không còn nạp lúc khởi động. matplotlib vẫn nạp (pyvista) |
 | 3 | — | | | | | | | | Huỷ — pyvista bắt buộc matplotlib |
-| 4 | | | | | | | | | |
+| 4 | 2026-10-28 | **705** | **2806** | 62 | **2.03** (đo tới lần vẽ đầu; run 1 ngay sau build: 11.67) | chờ đo | open3d preload 2.15 s ở nền | 138 passed, 74 s | Bỏ scipy, open3d/resources, VTK-m/viskores + ~50 module VTK. `check_bundle.py`: đủ 1835 module runtime. Sửa thêm: matplotlib dựng lại cache font **mỗi lần** chạy exe (PyInstaller rthook dùng thư mục tạm) → cache cố định; QSplashScreen chặn ~1 s → dùng QLabel; pdfkit `verbose=True` làm xuất PDF lỗi khi không có console → `verbose=False`. Mốc đo đổi sang "window painted" (sau lần vẽ đầu) — số baseline 3.29 s đo theo mốc cũ "MainWindow shown" (sớm hơn) |
 | 5 | | | | | | | | | |
 
 ---
