@@ -138,7 +138,14 @@ test chạy giống cấu hình thật.
 
 ### 2.5 Test chống tái phát
 Bổ sung `test_startup_imports.py`: sau khi import `pps.ui.main_window`, **không** có
-`matplotlib`, `jinja2`, `pdfkit`, `open3d`, `scipy` trong `sys.modules`.
+`jinja2`, `pdfkit`, `open3d`, `scipy` trong `sys.modules`.
+
+**matplotlib là ngoại lệ** (phát hiện ở Phase 0): `pyvista.plotting.colors` tự
+`import matplotlib.pyplot` trong `try/except ImportError` nếu môi trường có matplotlib, nên
+trong `.venv` dev nó luôn bị nạp. Bản build không có matplotlib (Phase 4) thì pyvista bỏ qua.
+Vì vậy test matplotlib theo kiểu khác: subprocess đặt `sys.modules["matplotlib"] = None`
+(chặn import) rồi import `pps.ui.main_window` và tạo 1 `pyvista.PolyData` → phải thành công.
+Phase 2 chỉ cần bảo đảm **code của `pps`** không import matplotlib ở cấp module.
 
 **Commits:** `Defer report and matplotlib imports`, `Show a splash screen during startup`,
 `Preload open3d in the background after the window is shown`
@@ -266,7 +273,7 @@ Xuất PDF từ sample với cùng thông số như bản baseline → **mọi s
 
 | Phase | Ngày | dist MB | Số file | Module VTK lúc khởi động | Warm (s) | Cold sau reboot (s) | Calculate lần đầu / lần sau (s) | pytest | Ghi chú |
 |---|---|---|---|---|---|---|---|---|---|
-| baseline | 2026-10-28 | 907 | 3276 | 153 | | | | | Import `main_window` lần đầu trong `.venv`: 288 s; warm 2,6–3,4 s |
+| baseline | 2026-10-28 | 900 | 3277 | 153 | 3.29 (run 1: 14.65) | chờ đo | | 131 passed, 71 s | Import `main_window` từ source: 2.41 s warm (lần đầu trong `.venv` từng đo 288 s). Top importtime: `vtk` 704 ms, `pyvistaqt` 671 ms, `pyvista.plotting` 479 ms, `matplotlib.pyplot` 367 ms (do pyvista), `matplotlib.path` 236 ms (do `picking.py`) |
 | 1 | | | | | | | | | |
 | 2 | | | | | | | | | |
 | 3 | | | | | | | | | |
