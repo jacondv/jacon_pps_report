@@ -93,7 +93,7 @@ test chạy giống cấu hình thật.
 `pps.ui.main_window`, assert:
 - `"vtkmodules.all"` không có trong `sys.modules`;
 - số module `vtkmodules.vtk*` ≤ 70 (ghi số thực tế đo được vào comment).
-(Phase 2 bổ sung assert cho matplotlib/jinja2/pdfkit/open3d.)
+(Phase 2 bổ sung assert cho jinja2/pdfkit/open3d.)
 
 ### 1.5 Đo
 `tools/startup_modules.py` + `-X importtime` → `importtime-phase1.txt`. Ghi Nhật ký.
@@ -110,9 +110,10 @@ test chạy giống cấu hình thật.
 - `tests/test_main_window_smoke.py::test_export_pdf_produces_real_file` có monkeypatch — kiểm
   tra đường dẫn còn đúng.
 
-### 2.2 matplotlib không nạp lúc khởi động
-- `render/picking.py:13` `from matplotlib.path import Path` → tạm chuyển vào trong
-  `points_in_polygon` (Phase 3 sẽ bỏ hẳn matplotlib).
+### 2.2 ~~matplotlib không nạp lúc khởi động~~ — huỷ
+pyvista 0.47 **bắt buộc** matplotlib (có trong `Requires` của pyvista; `pyvista/plotting/colors.py`
+`import matplotlib.pyplot` không bọc try/except) và nạp nó khi import → dời import trong
+`picking.py` không có tác dụng. Giữ nguyên `picking.py`.
 
 ### 2.3 Splash screen
 - Trong `main.py`: sau `create_app()` + `apply_theme()`, **trước** `from pps.ui.main_window import
@@ -140,49 +141,18 @@ test chạy giống cấu hình thật.
 Bổ sung `test_startup_imports.py`: sau khi import `pps.ui.main_window`, **không** có
 `jinja2`, `pdfkit`, `open3d`, `scipy` trong `sys.modules`.
 
-**matplotlib là ngoại lệ** (phát hiện ở Phase 0): `pyvista.plotting.colors` tự
-`import matplotlib.pyplot` trong `try/except ImportError` nếu môi trường có matplotlib, nên
-trong `.venv` dev nó luôn bị nạp. Bản build không có matplotlib (Phase 4) thì pyvista bỏ qua.
-Vì vậy test matplotlib theo kiểu khác: subprocess đặt `sys.modules["matplotlib"] = None`
-(chặn import) rồi import `pps.ui.main_window` và tạo 1 `pyvista.PolyData` → phải thành công.
-Phase 2 chỉ cần bảo đảm **code của `pps`** không import matplotlib ở cấp module.
+matplotlib không nằm trong danh sách: pyvista luôn nạp nó (xem 2.2).
 
-**Commits:** `Defer report and matplotlib imports`, `Show a splash screen during startup`,
+**Commits:** `Defer report imports until the first PDF export`, `Show a splash screen during startup`,
 `Preload open3d in the background after the window is shown`
 
 ---
 
-## Phase 3 — Bỏ matplotlib
+## Phase 3 — ~~Bỏ matplotlib~~ — HUỶ (2026-10-28)
 
-### 3.1 `render/picking.py::points_in_polygon`
-- Thay `matplotlib.path.Path(polygon).contains_points(points)` bằng numpy thuần (even-odd ray
-  casting, vector hoá theo cạnh). Giữ chữ ký và nhánh `< 3 đỉnh / 0 điểm → all False`.
-- Lọc trước bằng bounding box của polygon, chỉ ray-cast điểm trong bbox.
-- **Test** `tests/test_picking.py`:
-  - So khớp matplotlib trên 100k điểm ngẫu nhiên × (chữ nhật, polygon lõm, lasso 300 đỉnh) với
-    `pytest.importorskip("matplotlib")`. Chỉ cho phép lệch với điểm cách cạnh < 1e-9 px.
-  - Ca biên: polygon suy biến, mảng điểm rỗng.
-  - Hiệu năng: 2 triệu điểm × lasso 300 đỉnh không chậm hơn matplotlib quá 2 lần.
-
-### 3.2 Biểu đồ phân bố trong PDF — `report/core/html_pdf_generator.py::_create_distribution_chart`
-- Vẽ bằng **QPainter → QImage → PNG** (PySide6 có sẵn), module riêng `src/pps/report/charts.py`.
-- Giữ nguyên: 1200×675 px (= figsize 8×4.5 @ 150 dpi); 3 cột `< {tmin}`, `{tmin}-{tmax}`,
-  `> {tmax}`; màu `#ff6060`, `#64ffa0`, `#315aff`; nhãn đỉnh cột `"{count:,}\n({percent:.0f}%)"`;
-  tiêu đề "Thickness Distribution" đậm; trục X "Thickness Range (mm)", trục Y "Number of
-  Points"; lưới ngang nét đứt mờ; khoảng trống trên 20 %; vạch trục Y "nice numbers"; cột 0 điểm
-  vẫn có nhãn `0 (0%)`.
-- Vẫn ghi file tạm `pps_report_distribution_*.png` và trả đường dẫn → **key `chart_path` và
-  template HTML không đổi**.
-- QImage cần `QGuiApplication` — trong app luôn có; test dùng fixture `qapp`.
-- Lưu ảnh chart cũ và mới vào `docs/dep-slimming/compare/` để chủ dự án so bằng mắt.
-
-### 3.3 Gỡ
-- Xoá `matplotlib` khỏi `requirements.txt` và `hiddenimports` (`"matplotlib"`,
-  `"matplotlib.backends.backend_agg"`). `grep -rn matplotlib src` → rỗng.
-- **Chưa** thêm `matplotlib` vào `excludes` cho tới Phase 4 kiểm tra open3d có cần nó không.
-
-**Commits:** `Replace matplotlib point-in-polygon with numpy`, `Draw report distribution chart with QPainter`,
-`Remove matplotlib from runtime requirements`
+Không làm. pyvista 0.47.3 khai báo `matplotlib` là dependency bắt buộc và
+`pyvista.plotting.colors` import `matplotlib.pyplot` vô điều kiện khi nạp — bỏ matplotlib sẽ làm
+viewer 3D không chạy. Không có tag `slim/phase-3-done`.
 
 ---
 
@@ -195,8 +165,7 @@ Phase 2 chỉ cần bảo đảm **code của `pps`** không import matplotlib �
 → phải giữ.)
 
 ### 4.2 `build.spec`
-- `hiddenimports`: xoá `"scipy"`, `"reportlab"`, `"matplotlib"`, `"matplotlib.backends.backend_agg"`,
-  `"vtkmodules.all"`. Thay `collect_submodules("open3d")` bằng `["open3d", "open3d.cpu.pybind"]`
+- `hiddenimports`: xoá `"scipy"`, `"reportlab"`, `"vtkmodules.all"`. **Giữ** `"matplotlib"` (pyvista cần). Thay `collect_submodules("open3d")` bằng `["open3d", "open3d.cpu.pybind"]`
   + các submodule có trong `open3d-imports.txt` (bỏ `open3d.ml`, `open3d.visualization.gui`
   nếu không bị import).
 - `datas`: thay `collect_data_files("open3d")` bằng danh sách cụ thể, **thử bỏ**
@@ -204,7 +173,7 @@ Phase 2 chỉ cần bảo đảm **code của `pps`** không import matplotlib �
   `examples`. Kiểm chứng: exe chạy Calculate + Measure Area ra **đúng số golden**; nếu open3d báo
   thiếu resource → trả lại, ghi Nhật ký.
 - `excludes`: `PyQt5`, `PyQt6`, `tkinter`, `scipy`, `reportlab`, `pytest`, `IPython`,
-  `notebook`, `ipywidgets`, `matplotlib`, `jedi` — **trừ** những gì có trong
+  `notebook`, `ipywidgets`, `jedi` — **không** exclude `matplotlib` (pyvista cần); **trừ** những gì có trong
   `open3d-imports.txt`.
 - `console=False` (log đã ghi ra file; `_install_excepthook` vẫn log). Nếu lỗi xảy ra trước khi
   có cửa sổ, hiện `QMessageBox.critical` trong excepthook **chỉ khi** đã có `QApplication`.
@@ -232,9 +201,8 @@ Phase 2 chỉ cần bảo đảm **code của `pps`** không import matplotlib �
   có trong `used-modules.txt`). Bỏ `translations` Qt trừ `qtbase_en`.
 
 ### 4.5 Dọn mã chết
-- `requirements.txt`: xoá `scipy`, `reportlab`, `matplotlib`; tách `pytest`, `pytest-qt`,
-  `markdown` sang `requirements-dev.txt`; `matplotlib` vào `requirements-dev.txt` (chỉ cho test
-  so khớp ở Phase 3).
+- `requirements.txt`: xoá `scipy`, `reportlab`; **giữ** `matplotlib` (pyvista cần); tách `pytest`,
+  `pytest-qt`, `markdown` sang `requirements-dev.txt`.
 - Xoá `src/pps/report/sections/` (chỉ còn `__pycache__`) và `__pycache__` cũ của
   `pdf_generator`, `style_factory`, `shotcrete_template`.
 
@@ -260,7 +228,7 @@ Xuất PDF từ sample với cùng thông số như bản baseline → **mọi s
    và bản mới ở 2 lần khởi động lại khác nhau).
 6. Cập nhật `installer.iss` nếu đường dẫn/tệp thay đổi; build installer, cài thử trên máy sạch.
 7. Cập nhật `README.md` (yêu cầu cài đặt, kích thước) và ghi chú trong `docs/REFACTOR_PLAN.md`
-   §0 (đã gỡ matplotlib/reportlab/scipy; open3d giữ, nạp ở nền).
+   §0 (đã gỡ reportlab/scipy; matplotlib giữ vì pyvista cần; open3d giữ, nạp ở nền).
 8. Không xoá `.venv` cũ.
 9. Báo cáo cuối: Nhật ký đo, danh sách commit/tag, rủi ro còn lại. **Không merge** — chủ dự án
    merge theo README §4.4.
@@ -274,9 +242,9 @@ Xuất PDF từ sample với cùng thông số như bản baseline → **mọi s
 | Phase | Ngày | dist MB | Số file | Module VTK lúc khởi động | Warm (s) | Cold sau reboot (s) | Calculate lần đầu / lần sau (s) | pytest | Ghi chú |
 |---|---|---|---|---|---|---|---|---|---|
 | baseline | 2026-10-28 | 900 | 3277 | 153 | 3.29 (run 1: 14.65) | chờ đo | | 131 passed, 71 s | Import `main_window` từ source: 2.41 s warm (lần đầu trong `.venv` từng đo 288 s). Top importtime: `vtk` 704 ms, `pyvistaqt` 671 ms, `pyvista.plotting` 479 ms, `matplotlib.pyplot` 367 ms (do pyvista), `matplotlib.path` 236 ms (do `picking.py`) |
-| 1 | | | | | | | | | |
-| 2 | | | | | | | | | |
-| 3 | | | | | | | | | |
+| 1 | 2026-10-28 | 900 | 3285 | **62** | 2.71 (run 1 ngay sau build: 12.15) | chờ đo | | 132 passed, 71 s | Import `main_window` từ source 1.84 s (từ 2.41). Exe chưa kiểm CHECKLIST thủ công |
+| 2 | 2026-10-28 | — (chưa build) | | 62 | từ source: QApplication → splash 1.2 s (chi phí hiện cửa sổ Qt đầu tiên), → MainWindow shown 2.9 s | chờ đo | open3d preload 2.32 s ở nền | 136 passed, 69 s | jinja2/pdfkit không còn nạp lúc khởi động. matplotlib vẫn nạp (pyvista) |
+| 3 | — | | | | | | | | Huỷ — pyvista bắt buộc matplotlib |
 | 4 | | | | | | | | | |
 | 5 | | | | | | | | | |
 

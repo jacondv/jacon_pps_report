@@ -23,7 +23,7 @@ phải giữ **y nguyên**. Phương án bỏ open3d (Delaunay VTK) chỉ là d�
 | 7 file trong `src/pps/render/` dùng `import vtk` → nạp **toàn bộ 153 module VTK** (vtkWebCore, vtkIOLSDyna, vtkIOOggTheora, vtkAcceleratorsVTKmFilters …) dù chỉ dùng 15 class | pyvista + pyvistaqt chỉ cần **62** module |
 | Import `pps.ui.main_window` lần đầu (Defender chưa quét, `.venv`) | **288 s**, gần hết nằm trong `import vtk` |
 | Import `pps.ui.main_window` các lần sau | 2,6–3,4 s |
-| `matplotlib` (+ PIL) bị nạp lúc khởi động qua `render/picking.py` | |
+| `matplotlib` (+ PIL) bị nạp lúc khởi động — do pyvista 0.47 bắt buộc (không tránh được), ngoài ra `render/picking.py` | |
 | `jinja2`, `pdfkit` bị nạp lúc khởi động qua `ui/main_window.py:31` → `pps.report` | |
 | `open3d` **không** nạp lúc khởi động (đã import trong hàm) — nhưng `import open3d` mất 3,3 s (warm) và kéo theo `dash`, `plotly` → làm chậm **lần Calculate đầu tiên** | |
 
@@ -36,7 +36,7 @@ phải giữ **y nguyên**. Phương án bỏ open3d (Delaunay VTK) chỉ là d�
 | `dash` + `plotly` + `jedi` | 48 | Không dùng — `import open3d` kéo theo | Giữ những gói `import open3d` thực sự nạp; loại phần còn lại (Phase 4) |
 | `scipy` | 78 | **Không có import nào** | **Bỏ** (Phase 4) |
 | `report/` (wkhtmltopdf ~40 MB) | 80 | Xuất PDF | Giữ |
-| `matplotlib` | 12 | `picking.py`, biểu đồ PDF | **Bỏ** (Phase 3) |
+| `matplotlib` | 12 | `picking.py`, biểu đồ PDF, **pyvista bắt buộc** | Giữ (pyvista 0.47 cần) |
 | `reportlab` | — | **Không dùng** | **Bỏ** (Phase 4) |
 | `PySide6` | 103 | UI | Giữ, loại module Qt không dùng (Phase 4) |
 | `PIL` | 13 | pyvista cần | Giữ |
@@ -53,7 +53,7 @@ vtk 9.6.1, numpy 2.2.6, open3d 0.19.0, PyInstaller 6.20.0.
 2. **Số liệu không đổi**: `tests/test_calculator_golden.py` xanh nguyên vẹn (`rel=1e-9`) ở mọi
    phase. Không được sửa `tests/golden/sample_baseline.json`.
 3. **Khởi động**: số module `vtkmodules.vtk*` nạp lúc mở cửa sổ ≤ 70 (từ 153); không nạp
-   `matplotlib`, `jinja2`, `pdfkit`, `open3d` trước khi cửa sổ hiện.
+   `jinja2`, `pdfkit`, `open3d` trước khi cửa sổ hiện (matplotlib không tránh được — pyvista cần).
 4. **Đo được** (ghi vào [PLAN.md §Nhật ký đo](PLAN.md#nhật-ký-đo)):
    - Cold start (đo ngay sau khi **khởi động lại máy**) giảm rõ rệt so với baseline.
    - Dung lượng `dist/` ≤ 750 MB, số file giảm ≥ 25 %.
