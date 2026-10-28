@@ -50,6 +50,12 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription: "Additional shortcuts:"
 Name: "defenderexclusion"; Description: "Add a Windows Defender exclusion for the install folder (recommended — avoids a slow antivirus scan the first time the app is launched)"; GroupDescription: "Startup performance:"
 
+[InstallDelete]
+; Upgrading over an older version: remove the old bundle first, otherwise
+; libraries a newer build no longer ships (e.g. scipy, unused VTK modules)
+; stay behind in the install folder. _internal only holds installer-owned files.
+Type: filesandordirs; Name: "{app}\_internal"
+
 [Files]
 Source: "{#MyAppSourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 

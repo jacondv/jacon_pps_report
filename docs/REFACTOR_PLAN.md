@@ -22,6 +22,7 @@ Ràng buộc bất biến:
 - Viết lại hoàn toàn phần tool tương tác cloud, không tái sử dụng code cũ.
 - Tên tool theo chức năng nghiệp vụ, không theo hình dạng.
 - Giữ thư viện chính: PySide6, pyvista/pyvistaqt, VTK, numpy, plyfile, reportlab, matplotlib (+ open3d cho BPA, jinja2/pdfkit cho HTML→PDF — đang dùng, giữ).
+  - *Cập nhật 2026-10-28 ([dep-slimming](dep-slimming/README.md)):* đã gỡ `reportlab` và `scipy` (không dùng). `matplotlib` giữ vì pyvista bắt buộc. `open3d` giữ, nạp ở nền sau khi cửa sổ hiện. Code render import VTK theo từng `vtkmodules.*`, không dùng `import vtk`.
 
 ---
 
