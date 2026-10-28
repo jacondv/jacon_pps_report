@@ -398,7 +398,7 @@
 
     <section id="projects">
       <h2><span class="num">4</span> Saving & Opening Projects</h2>
-      <p>Besides the source <code>.ply</code>, the application can save your entire working session — segments, notes, annotations, measurements, target range, camera position — to a <code>.ppsproj</code> project file, so you can close the app and pick up exactly where you left off.</p>
+      <p>Besides the source <code>.ply</code>, the application can save your entire working session — segments, notes, annotations, measurements, target range, camera position, point size — to a <code>.ppsproj</code> project file, so you can close the app and pick up exactly where you left off.</p>
       <table>
       <thead>
       <tr>
@@ -523,7 +523,13 @@
       <h3>Distance</h3>
       <p>Select the <strong>Distance</strong> tool, click the first point on the cloud, move the mouse to see a live preview line and running distance, then click the second point to finish. The result is attached to the nearest segment and appears in the Project tree.</p>
       <h3>Area</h3>
-      <p>Select the <strong>Area</strong> tool and draw a region the same way as a selection shape. The true surface area (not the flat projected area) is computed using Ball-Pivoting surface reconstruction (BPA) — the same method the PDF report itself uses — and is displayed on the model a few seconds after the region is closed, once the background calculation finishes.</p>
+      <p>Select the <strong>Area</strong> tool and draw a frame on the cloud the same way as a selection shape (polygon, rectangle or lasso). When the frame is closed:</p>
+      <ul>
+      <li>It <strong>snaps onto the cloud surface you are looking at</strong> — the outline is made of cloud points, so it stays attached to the cloud and rotates/zooms with it.</li>
+      <li>Only the points <strong>enclosed by that outline on that surface</strong> are measured. Surfaces hidden behind the region (for example the opposite tunnel wall) are never included, whatever the viewing angle.</li>
+      <li>The true surface area (not the flat projected area) of those points is computed using Ball-Pivoting surface reconstruction (BPA) — the same method the PDF report itself uses — and is displayed on the model a few seconds later, once the background calculation finishes.</li>
+      </ul>
+      <p>Draw the frame on the cloud itself: parts of the frame drawn on empty background are ignored, and a frame entirely off the cloud creates no measurement. Area measurements from projects saved with an older version keep their value and label but have no outline.</p>
     </section>
 
     <section id="notes">
@@ -595,8 +601,9 @@
       <h2><span class="num">10</span> Calculation & Targets</h2>
       <div class="grid-2">
       <div>
-      <p>In the <strong>Properties</strong> dock, set <strong>Min target thickness</strong> and <strong>Max target thickness</strong> (mm) to match the design requirement. The model re-colors and the Results dock refreshes automatically about 0.5 seconds after you stop typing. Max is always kept ≥ Min automatically.</p>
-      <p>Click <strong>Calculate</strong> on the main toolbar to run the full analysis. This runs in the background so the UI stays responsive on large clouds.</p>
+      <p>In the <strong>Properties</strong> dock, set <strong>Min target thickness</strong> and <strong>Max target thickness</strong> (mm) to match the design requirement. The model re-colors automatically about 0.5 seconds after you stop typing. Max is always kept ≥ Min automatically.</p>
+      <p>Click <strong>Calculate</strong> on the main toolbar to run the full analysis of the <strong>visible</strong> clouds. This runs in the background so the UI stays responsive on large clouds.</p>
+      <p>The results belong to the targets and visible clouds they were calculated for. Changing either — editing Min/Max, or showing/hiding a cloud in the Project tree — clears the Results dock; click <strong>Calculate</strong> again (renaming or recoloring a cloud does not).</p>
       </div>
       <figure style="margin:0;">
               <img src="images/calculate_properties_dock.png" alt="">
@@ -657,7 +664,7 @@
 
     <section id="export">
       <h2><span class="num">11</span> Exporting PDF Reports</h2>
-      <p>Once <strong>Calculate</strong> has run, click <strong>Export PDF…</strong> (<kbd>Ctrl</kbd>+<kbd>E</kbd>) on the toolbar and choose where to save. The default filename is built from the parsed project name, job number, scan time and segment name (see <a href="#open-file">Opening a PLY File</a>).</p>
+      <p>Once <strong>Calculate</strong> has run, click <strong>Export PDF…</strong> (<kbd>Ctrl</kbd>+<kbd>E</kbd>) on the toolbar and choose where to save. If there are no up-to-date results — never calculated, or the targets or visible clouds changed since — a <strong>Calculation required</strong> prompt appears: <strong>OK</strong> runs Calculate and then continues straight to saving the report, <strong>Cancel</strong> stops the export. The default filename is built from the parsed project name, job number, scan time and segment name (see <a href="#open-file">Opening a PLY File</a>).</p>
       <p>The generated report includes:</p>
       <ul>
       <li>A snapshot of the current 3D view (including any visible Notes/Annotations and the color legend).</li>
@@ -701,7 +708,7 @@
       </tr>
       <tr>
       <td>Point size</td>
-      <td>Default rendered point size for newly loaded/colored layers</td>
+      <td>Rendered point size. Also adjustable in the Properties dock; the last size used is remembered for the next launch, and opening a project applies the size saved in it</td>
       </tr>
       <tr>
       <td>Thickness Classification Colors</td>
@@ -834,8 +841,8 @@
       </thead>
       <tbody>
       <tr>
-      <td>"Please run calculation first!"</td>
-      <td>Export PDF requires a completed Calculate run — click Calculate first.</td>
+      <td>"Calculation required" when exporting</td>
+      <td>The results are missing or out of date (targets or visible clouds changed). Press OK to calculate and continue the export.</td>
       </tr>
       <tr>
       <td>"Please load a PLY file first!"</td>

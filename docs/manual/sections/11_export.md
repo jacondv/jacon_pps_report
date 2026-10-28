@@ -3,7 +3,7 @@ id: export
 number: 11
 title: Exporting PDF Reports
 ---
-Once **Calculate** has run, click **Export PDF…** (<kbd>Ctrl</kbd>+<kbd>E</kbd>) on the toolbar and choose where to save. The default filename is built from the parsed project name, job number, scan time and segment name (see [Opening a PLY File](#open-file)).
+Once **Calculate** has run, click **Export PDF…** (<kbd>Ctrl</kbd>+<kbd>E</kbd>) on the toolbar and choose where to save. If there are no up-to-date results — never calculated, or the targets or visible clouds changed since — a **Calculation required** prompt appears: **OK** runs Calculate and then continues straight to saving the report, **Cancel** stops the export. The default filename is built from the parsed project name, job number, scan time and segment name (see [Opening a PLY File](#open-file)).
 
 The generated report includes:
 

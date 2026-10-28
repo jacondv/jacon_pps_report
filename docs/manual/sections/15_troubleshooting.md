@@ -5,7 +5,7 @@ title: Tips & Troubleshooting
 ---
 | Message / Situation | What it means |
 | --- | --- |
-| "Please run calculation first!" | Export PDF requires a completed Calculate run — click Calculate first. |
+| "Calculation required" when exporting | The results are missing or out of date (targets or visible clouds changed). Press OK to calculate and continue the export. |
 | "Please load a PLY file first!" | Shown by Calculate/Export when no cloud is loaded yet. |
 | A tool button is disabled | All six tools require a point cloud to be loaded; they re-enable automatically once one is. |
 | Segments look overlapped / hidden | Extracting a segment automatically hides every other layer — check the Project tree checkboxes if something seems missing. |

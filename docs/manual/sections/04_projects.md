@@ -3,7 +3,7 @@ id: projects
 number: 4
 title: Saving & Opening Projects
 ---
-Besides the source `.ply`, the application can save your entire working session — segments, notes, annotations, measurements, target range, camera position — to a `.ppsproj` project file, so you can close the app and pick up exactly where you left off.
+Besides the source `.ply`, the application can save your entire working session — segments, notes, annotations, measurements, target range, camera position, point size — to a `.ppsproj` project file, so you can close the app and pick up exactly where you left off.
 
 | Action | Shortcut | Notes |
 | --- | --- | --- |
