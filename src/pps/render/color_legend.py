@@ -1,13 +1,13 @@
 """
-Compact 3-band thickness classification color legend (< target_min /
-within / > target_max), drawn on the overlay render layer so it's always
+Compact thickness classification color legend (< target_min / within /
+> target_max, plus a top band for > max measurable = noise), drawn on the overlay render layer so it's always
 visible on top of the point cloud regardless of camera — and, since the
 PDF report screenshot captures both render layers composited together,
 the legend is automatically included in the exported report too.
 
-Deliberately minimal: no title text — just the three colors (matching
+Deliberately minimal: no title text — just the four colors (matching
 LayerRenderer's classification colors), a thin border, tick marks at the
-two boundaries, and the boundary values in mm. Anchored to the viewport's
+boundaries, and the boundary values in mm. Anchored to the viewport's
 right edge in normalized viewport coordinates so it stays put across
 window resizes without recomputing.
 """
@@ -15,10 +15,14 @@ window resizes without recomputing.
 from vtkmodules.vtkCommonDataModel import vtkCellArray, vtkLine, vtkPolyData
 from vtkmodules.vtkRenderingCore import vtkActor2D, vtkCoordinate, vtkPolyDataMapper2D, vtkTextActor
 
+from pps.core.calculator import DEFAULT_MAX_MEASURABLE_MM
 from pps.render.actors2d import vtk_points_2d
+from pps.render.layer_renderer import DEFAULT_COLOR_OUT_OF_RANGE
 
 _BAR_WIDTH = 0.028
-_BAR_HEIGHT = 0.32
+_BAND_HEIGHT = 0.32 / 3
+_BAND_COUNT = 4
+_BAR_HEIGHT = _BAND_HEIGHT * _BAND_COUNT
 _BAR_RIGHT_MARGIN = 0.025
 _BAR_BOTTOM = 0.34
 _TICK_LENGTH = 0.012
@@ -109,7 +113,7 @@ class ColorLegend:
 
     def __init__(self, overlay_renderer):
         self._renderer = overlay_renderer
-        self._bands = [_quad_actor() for _ in range(3)]  # bottom -> top
+        self._bands = [_quad_actor() for _ in range(_BAND_COUNT)]  # bottom -> top
         for actor, _points in self._bands:
             self._renderer.AddActor(actor)
 
@@ -119,25 +123,38 @@ class ColorLegend:
         self._tick_zero = _line_actor(2)
         self._tick_min = _line_actor(2)
         self._tick_max = _line_actor(2)
+        self._tick_measurable = _line_actor(2)
         self._renderer.AddActor(self._tick_zero[0])
         self._renderer.AddActor(self._tick_min[0])
         self._renderer.AddActor(self._tick_max[0])
+        self._renderer.AddActor(self._tick_measurable[0])
 
         self._label_zero = _label_actor()
         self._label_min = _label_actor()
         self._label_max = _label_actor()
+        self._label_measurable = _label_actor()
         self._renderer.AddActor(self._label_zero)
         self._renderer.AddActor(self._label_min)
         self._renderer.AddActor(self._label_max)
+        self._renderer.AddActor(self._label_measurable)
 
-    def update(self, color_below, color_within, color_above, target_min: float, target_max: float) -> None:
+    def update(
+        self,
+        color_below,
+        color_within,
+        color_above,
+        target_min: float,
+        target_max: float,
+        color_out_of_range=DEFAULT_COLOR_OUT_OF_RANGE,
+        max_measurable_mm: float = DEFAULT_MAX_MEASURABLE_MM,
+    ) -> None:
         x1 = 1.0 - _BAR_RIGHT_MARGIN - _BAR_WIDTH
         x2 = 1.0 - _BAR_RIGHT_MARGIN
-        band_h = _BAR_HEIGHT / 3.0
+        band_h = _BAND_HEIGHT
         y0 = _BAR_BOTTOM
-        y_min, y_max = y0 + band_h, y0 + 2 * band_h
+        y_min, y_max, y_measurable = y0 + band_h, y0 + 2 * band_h, y0 + 3 * band_h
 
-        colors = (color_below, color_within, color_above)
+        colors = (color_below, color_within, color_above, color_out_of_range)
         for i, ((actor, points), color) in enumerate(zip(self._bands, colors)):
             y1, y2 = y0 + i * band_h, y0 + (i + 1) * band_h
             for j, (x, y) in enumerate([(x1, y1), (x2, y1), (x2, y2), (x1, y2)]):
@@ -163,6 +180,10 @@ class ColorLegend:
         max_points.SetPoint(0, tick_x1, y_max, 0.0)
         max_points.SetPoint(1, x1, y_max, 0.0)
         max_points.Modified()
+        measurable_points = self._tick_measurable[1]
+        measurable_points.SetPoint(0, tick_x1, y_measurable, 0.0)
+        measurable_points.SetPoint(1, x1, y_measurable, 0.0)
+        measurable_points.Modified()
 
         label_x = tick_x1 - _LABEL_GAP
         self._label_zero.SetInput(_format_mm(0))
@@ -171,6 +192,8 @@ class ColorLegend:
         self._label_min.GetPositionCoordinate().SetValue(label_x, y_min)
         self._label_max.SetInput(_format_mm(target_max))
         self._label_max.GetPositionCoordinate().SetValue(label_x, y_max)
+        self._label_measurable.SetInput(_format_mm(max_measurable_mm))
+        self._label_measurable.GetPositionCoordinate().SetValue(label_x, y_measurable)
 
     def set_visible(self, visible: bool) -> None:
         for actor, _points in self._bands:
@@ -179,6 +202,8 @@ class ColorLegend:
         self._tick_zero[0].SetVisibility(visible)
         self._tick_min[0].SetVisibility(visible)
         self._tick_max[0].SetVisibility(visible)
+        self._tick_measurable[0].SetVisibility(visible)
         self._label_zero.SetVisibility(visible)
         self._label_min.SetVisibility(visible)
         self._label_max.SetVisibility(visible)
+        self._label_measurable.SetVisibility(visible)

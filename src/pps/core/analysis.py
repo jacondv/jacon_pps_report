@@ -1,12 +1,8 @@
 """
 Run the area/volume/distribution calculation pipeline.
 
-This replicates CalculationWorker.run() from the old gui/main_window.py
-exactly: `calculate_area_and_volume()` mutates `distances` in place (clips
-|d|<12 and |d|>500 to 0), and `calculate_thickness_distribution()` is then
-called on that SAME mutated array. The order and the shared array are load
-bearing for the reported Below/Within/Above counts — do not "fix" this by
-passing a copy.
+Both steps clean the distances the same way (|d|, < 12 mm -> 0) and leave
+out points above `max_measurable_mm`; neither modifies `distances`.
 """
 
 from typing import Tuple
@@ -14,6 +10,7 @@ from typing import Tuple
 import numpy as np
 
 from pps.core.calculator import (
+    DEFAULT_MAX_MEASURABLE_MM,
     CalculationResult,
     ThicknessDistribution,
     calculate_area_and_volume,
@@ -31,9 +28,14 @@ def run_analysis(
     distances: np.ndarray,
     target_min: float,
     target_max: float,
+    max_measurable_mm: float = DEFAULT_MAX_MEASURABLE_MM,
 ) -> Tuple[CalculationResult, ThicknessDistribution]:
-    calc = calculate_area_and_volume(points, distances, target_min=target_min)
-    dist = calculate_thickness_distribution(distances, target_min, target_max)
+    calc = calculate_area_and_volume(
+        points, distances, target_min=target_min, max_measurable_mm=max_measurable_mm
+    )
+    dist = calculate_thickness_distribution(
+        distances, target_min, target_max, max_measurable_mm=max_measurable_mm
+    )
     return calc, dist
 
 

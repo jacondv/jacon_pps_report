@@ -38,6 +38,7 @@
     th { background: #f7fafc; font-weight: bold; text-align: left; }
     td { color: #1a202c; }
     .chart, .screenshot { display: block; margin: 12px auto; max-width: 100%; max-height: 100%;object-fit: contain;}
+    .chart-note { margin: 2px 0 8px; font-size: 12px; font-style: italic; color: #b45309; text-align: center; }
     .chart-container { height: 280px; display: flex; justify-content: center;  /* ngang */align-items: center;  /* dọc */}
     .screenshot-block {
       height: 400px;
@@ -134,6 +135,9 @@
   <div class="chart-container">
     <img class="chart" src="{{ chart_path }}" alt="Distribution Chart" />
   </div>
+  {% endif %}
+  {% if out_of_range_note %}
+  <div class="chart-note">{{ out_of_range_note }}</div>
   {% endif %}
 
   <!-- {% if segment_notes %}

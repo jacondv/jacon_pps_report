@@ -5,11 +5,36 @@ Uses surface reconstruction and thickness information.
 
 import numpy as np
 from dataclasses import dataclass
-from typing import Tuple, List, Optional
+from typing import Optional
 
 from pps.core.surface_area import surface_area as bpa_surface_area
 
 from pps.utils.timing import timeit
+
+# |d| below this is treated as "no damage" and set to 0.
+NO_DAMAGE_THRESHOLD_MM = 12.0
+# Default upper limit of the PPS hardware's measurable range. Points above
+# it are treated as noise: excluded from every thickness figure and from the
+# distribution, but still used for the surface area. User-configurable in
+# Settings (AppSettings.max_measurable_mm).
+DEFAULT_MAX_MEASURABLE_MM = 300.0
+
+
+def clean_distances(distances: np.ndarray) -> np.ndarray:
+    """Return |distances| with values below NO_DAMAGE_THRESHOLD_MM set to 0.
+
+    Returns a new array; the input is never modified.
+    """
+    cleaned = np.abs(np.asarray(distances, dtype=np.float64))
+    cleaned[cleaned < NO_DAMAGE_THRESHOLD_MM] = 0.0
+    return cleaned
+
+
+def in_range_mask(distances: np.ndarray, max_measurable_mm: float) -> np.ndarray:
+    """True for points inside the measurable range (|d| <= max_measurable_mm).
+    A point exactly at the limit is kept."""
+    return np.abs(np.asarray(distances)) <= max_measurable_mm
+
 
 @dataclass
 class CalculationResult:
@@ -22,6 +47,14 @@ class CalculationResult:
     std_thickness_mm: float
     num_points: int
     area_reached_target_m2: float = 0
+    out_of_range_count: int = 0  # points with |d| > max_measurable_mm (noise)
+    max_measurable_mm: float = DEFAULT_MAX_MEASURABLE_MM
+
+    @property
+    def out_of_range_percent(self) -> float:
+        if self.num_points > 0:
+            return 100 * self.out_of_range_count / self.num_points
+        return 0.0
 
     @property
     def surface_area_cm2(self) -> float:
@@ -68,8 +101,6 @@ def _extract_points_and_distances(cloud):
 
     if isinstance(cloud, tuple) and len(cloud) == 2:
         pts, dists = cloud
-        #TODO: xử lý dists < -30 này là lỗi sai normal, cần xem xét lại cách tính thickness
-
         return np.asarray(pts, dtype=np.float64), np.asarray(dists, dtype=np.float64)
 
     if hasattr(cloud, 'points') and hasattr(cloud, 'distances'):
@@ -104,19 +135,33 @@ def _to_open3d_pointcloud(cloud, points=None):
 
 
 @timeit
-def calculate_area_and_volume(*args, method: str = "bpa", target_min=None) -> CalculationResult:
+def calculate_area_and_volume(
+    *args,
+    method: str = "bpa",
+    target_min=None,
+    max_measurable_mm: float = DEFAULT_MAX_MEASURABLE_MM,
+) -> CalculationResult:
     """
     Calculate surface area and volume from a cloud-like object.
 
-    Volume is calculated as: Surface Area × Mean Thickness
+    Thickness rules:
+      * |d| < 12 mm is set to 0 (no damage); every other value is |d|.
+      * |d| > max_measurable_mm is noise: masked out of the "reached" points
+        (so out of mean/min/max/std, reached area and volume) but still part
+        of the total surface area.
+      * A point reaches the target when d > target_min (default 20 mm).
+
+    Volume = reached area x mean thickness of the reached points.
 
     Args:
         *args: Either (cloud,) where cloud has .points and .distances or is a
                tuple/list (points, distances), or (points, distances).
         method: Ignored. BPA is always used for surface area estimation.
+        target_min: Lower bound of the target range (mm).
+        max_measurable_mm: Upper limit of the measurable range (mm).
 
     Returns:
-        CalculationResult with area and volume
+        CalculationResult with area and volume. `distances` is not modified.
     """
     if len(args) == 1:
         cloud = args[0]
@@ -138,39 +183,45 @@ def calculate_area_and_volume(*args, method: str = "bpa", target_min=None) -> Ca
             max_thickness_mm=0,
             std_thickness_mm=0,
             num_points=0,
-            area_reached_target_m2=0
+            area_reached_target_m2=0,
+            max_measurable_mm=max_measurable_mm,
         )
 
-    distances[np.abs(distances) < 12] = 0 # set thickness < 12mm to 0, consider as no damage (tùy chỉnh ngưỡng này)
-    distances[np.abs(distances) > 500] = 0 # set thickness > 500mm to 0, consider as noise
+    cleaned = clean_distances(distances)
+    in_range = in_range_mask(cleaned, max_measurable_mm)
+    out_of_range_count = int(np.count_nonzero(cleaned > max_measurable_mm))
 
-    _min_reached_thickness_mm = target_min if target_min is not None else 20
-    _mask_reached_target = distances > _min_reached_thickness_mm
+    min_reached_thickness_mm = target_min if target_min is not None else 20
+    mask_reached_target = in_range & (cleaned > min_reached_thickness_mm)
 
-    _reached_points = points[_mask_reached_target]
-    _reached_distances = distances[_mask_reached_target]
-    if len(_reached_points) < 100:  # ngưỡng tùy chọn
+    reached_points = points[mask_reached_target]
+    reached_distances = cleaned[mask_reached_target]
+    if len(reached_points) < 100:
         reached_area = 0.0
     else:
-        reached_pcd = _to_open3d_pointcloud(None, _reached_points)
+        reached_pcd = _to_open3d_pointcloud(None, reached_points)
         reached_area = bpa_surface_area(reached_pcd, radii=(0.05, 0.1))  # m²
 
-    has_reached = len(_reached_distances) > 0
-    avg_thickness_mm = _reached_distances.mean() if has_reached else 0
+    has_reached = len(reached_distances) > 0
+    avg_thickness_mm = float(reached_distances.mean()) if has_reached else 0.0
 
+    # Total area uses every point, out-of-range ones included: dropping
+    # them would punch holes in the surface.
     pcd = _to_open3d_pointcloud(cloud, points)
-    total_area_m2 = bpa_surface_area(pcd,radii=(0.05, 0.1))
-    volume_m3 = reached_area * avg_thickness_mm/1000
+    total_area_m2 = bpa_surface_area(pcd, radii=(0.05, 0.1))
+    volume_m3 = reached_area * avg_thickness_mm / 1000
 
     return CalculationResult(
         surface_area_m2=total_area_m2,
         volume_m3=volume_m3,
         mean_thickness_mm=avg_thickness_mm,
-        min_thickness_mm=float(np.min(_reached_distances)) if has_reached else 0.0,
-        max_thickness_mm=float(np.max(_reached_distances)) if has_reached else 0.0,
-        std_thickness_mm=float(np.std(_reached_distances)) if has_reached else 0.0,
+        min_thickness_mm=float(np.min(reached_distances)) if has_reached else 0.0,
+        max_thickness_mm=float(np.max(reached_distances)) if has_reached else 0.0,
+        std_thickness_mm=float(np.std(reached_distances)) if has_reached else 0.0,
         num_points=len(points),
-        area_reached_target_m2=reached_area
+        area_reached_target_m2=reached_area,
+        out_of_range_count=out_of_range_count,
+        max_measurable_mm=max_measurable_mm,
     )
 
 
@@ -178,22 +229,31 @@ def calculate_area_and_volume(*args, method: str = "bpa", target_min=None) -> Ca
 def calculate_thickness_distribution(distances: np.ndarray,
                                     target_min: float,
                                     target_max: float,
-                                    num_bins: int = 50) -> ThicknessDistribution:
+                                    num_bins: int = 50,
+                                    max_measurable_mm: float = DEFAULT_MAX_MEASURABLE_MM,
+                                    ) -> ThicknessDistribution:
     """
     Calculate thickness distribution for histogram.
-    
+
+    Distances are cleaned the same way as in calculate_area_and_volume()
+    (|d|, < 12 mm -> 0), and out-of-range points (> max_measurable_mm) are
+    left out entirely, so counts and percentages cover in-range points only.
+
     Args:
-        distances: Array of thickness values in mm
+        distances: Array of thickness values in mm (not modified)
         target_min: Minimum target thickness (mm)
         target_max: Maximum target thickness (mm)
         num_bins: Number of histogram bins
-        
+        max_measurable_mm: Upper limit of the measurable range (mm)
+
     Returns:
         ThicknessDistribution with histogram data
     """
-    # Filter valid values
-    valid = distances[~np.isnan(distances) & ~np.isinf(distances)]
-    
+    finite = np.asarray(distances, dtype=np.float64)
+    finite = finite[np.isfinite(finite)]
+    cleaned = clean_distances(finite)
+    valid = cleaned[in_range_mask(cleaned, max_measurable_mm)]
+
     if len(valid) == 0:
         return ThicknessDistribution(
             below_target=0,

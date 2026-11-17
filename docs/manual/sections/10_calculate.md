@@ -32,14 +32,16 @@ style: flush
 | Mean / Min / Max Thickness (mm) | Statistics computed over points that reached the target thickness |
 | Std Deviation | Standard deviation of thickness over the same set of points |
 | Number of Points | Total point count in the visible cloud |
-| Below / Within / Above Target | Point counts and percentages split by the Target Min/Max range |
+| Below / Within / Above Target | Point counts and percentages split by the Target Min/Max range (out-of-range points not included) |
+| Out of Range | Points thicker than the max measurable thickness (default 300 mm), treated as noise |
 
-The three color classes correspond to the colors configured in [Settings](#settings):
+The color classes correspond to the colors configured in [Settings](#settings):
 
 - **Below Target Min** (default: red) — insufficient shotcrete thickness.
 - **Within Target Min–Max** (default: green) — meets the design requirement.
 - **Above Target Max** (default: blue) — over-sprayed beyond the target.
+- **Above Max Measurable** (default: light blue) — outside the PPS System's measurable range, treated as noise.
 
 <div class="callout warn">
-<strong>Note:</strong> thickness values with an absolute magnitude below 12 mm are treated as no measurable deviation, and values above 500 mm are treated as scan noise — both are excluded from the "reached target" statistics. The PPS System hardware's own valid measurement range is 0–300 mm, so the 500 mm cutoff is a deliberately generous software-side margin above that — it only catches genuine scan artifacts (e.g. reflections), not real thickness readings.
+<strong>Note:</strong> thickness is taken as an absolute value, and values below 12 mm are treated as no measurable deviation (0 mm). Values above the <strong>max measurable thickness</strong> (default 300 mm, the PPS System hardware's valid measurement range; change it in <a href="#settings">Settings</a>) are treated as scan noise: they are left out of the thickness statistics, the target coverage, the volume and the distribution chart, but still count towards the total surface area so the surface has no holes. When there are such points, the report prints a warning under the distribution chart with their number and share — a high share usually means the pre-scan and post-scan are misaligned.
 </div>

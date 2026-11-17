@@ -649,18 +649,23 @@
       </tr>
       <tr>
       <td>Below / Within / Above Target</td>
-      <td>Point counts and percentages split by the Target Min/Max range</td>
+      <td>Point counts and percentages split by the Target Min/Max range (out-of-range points not included)</td>
+      </tr>
+      <tr>
+      <td>Out of Range</td>
+      <td>Points thicker than the max measurable thickness (default 300 mm), treated as noise</td>
       </tr>
       </tbody>
       </table>
-      <p>The three color classes correspond to the colors configured in <a href="#settings">Settings</a>:</p>
+      <p>The color classes correspond to the colors configured in <a href="#settings">Settings</a>:</p>
       <ul>
       <li><strong>Below Target Min</strong> (default: red) — insufficient shotcrete thickness.</li>
       <li><strong>Within Target Min–Max</strong> (default: green) — meets the design requirement.</li>
       <li><strong>Above Target Max</strong> (default: blue) — over-sprayed beyond the target.</li>
+      <li><strong>Above Max Measurable</strong> (default: light blue) — outside the PPS System's measurable range, treated as noise.</li>
       </ul>
       <div class="callout warn">
-      <strong>Note:</strong> thickness values with an absolute magnitude below 12 mm are treated as no measurable deviation, and values above 500 mm are treated as scan noise — both are excluded from the "reached target" statistics. The PPS System hardware's own valid measurement range is 0–300 mm, so the 500 mm cutoff is a deliberately generous software-side margin above that — it only catches genuine scan artifacts (e.g. reflections), not real thickness readings.
+      <strong>Note:</strong> thickness is taken as an absolute value, and values below 12 mm are treated as no measurable deviation (0 mm). Values above the <strong>max measurable thickness</strong> (default 300 mm, the PPS System hardware's valid measurement range; change it in <a href="#settings">Settings</a>) are treated as scan noise: they are left out of the thickness statistics, the target coverage, the volume and the distribution chart, but still count towards the total surface area so the surface has no holes. When there are such points, the report prints a warning under the distribution chart with their number and share — a high share usually means the pre-scan and post-scan are misaligned.
       </div>
     </section>
 
@@ -687,7 +692,7 @@
       <h2><span class="num">12</span> Application Settings</h2>
       <div class="grid-2">
       <div>
-      <p>Open <code>Settings → Preferences…</code> to configure theme, point size, thickness classification colors, 3D view background, report title/logo, and PDF auto-open. These preferences are stored per-user and persist across sessions and across different point cloud files.</p>
+      <p>Open <code>Settings → Preferences…</code> to configure theme, point size, thickness classification colors, max measurable thickness, 3D view background, report title/logo, and PDF auto-open. These preferences are stored per-user and persist across sessions and across different point cloud files.</p>
       </div>
       <figure style="margin:0;">
               <img src="images/settings_dialog.png" alt="">
@@ -714,7 +719,11 @@
       </tr>
       <tr>
       <td>Thickness Classification Colors</td>
-      <td>The three colors used for Below / Within / Above target</td>
+      <td>The colors used for Below / Within / Above target, and for points above the max measurable thickness (noise)</td>
+      </tr>
+      <tr>
+      <td>Max measurable thickness</td>
+      <td>Thickness above this value (default 300 mm) is treated as noise and left out of the thickness figures and the distribution chart; the surface area still includes these points. Changing it requires running Calculate again</td>
       </tr>
       <tr>
       <td>3D View Background</td>

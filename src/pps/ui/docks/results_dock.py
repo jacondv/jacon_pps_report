@@ -51,12 +51,16 @@ class ResultsDock(QDockWidget):
         self.lbl_below = QLabel("-")
         self.lbl_within = QLabel("-")
         self.lbl_above = QLabel("-")
+        self.lbl_out_of_range = QLabel("-")
         dist_layout.addWidget(QLabel("Below Target:"))
         dist_layout.addWidget(self.lbl_below)
         dist_layout.addWidget(QLabel("Within Target:"))
         dist_layout.addWidget(self.lbl_within)
         dist_layout.addWidget(QLabel("Above Target:"))
         dist_layout.addWidget(self.lbl_above)
+        self.lbl_out_of_range_title = QLabel("Out of Range (noise, excluded):")
+        dist_layout.addWidget(self.lbl_out_of_range_title)
+        dist_layout.addWidget(self.lbl_out_of_range)
         layout.addWidget(dist_group)
 
         self.progress_bar = QProgressBar()
@@ -91,12 +95,16 @@ class ResultsDock(QDockWidget):
         self.lbl_below.setText(f"{dist.below_target:,} points ({dist.below_target_percent:.1f}%)")
         self.lbl_within.setText(f"{dist.within_target:,} points ({dist.within_target_percent:.1f}%)")
         self.lbl_above.setText(f"{dist.above_target:,} points ({dist.above_target_percent:.1f}%)")
+        self.lbl_out_of_range_title.setText(f"Out of Range (> {calc.max_measurable_mm:.0f} mm, excluded):")
+        self.lbl_out_of_range.setText(
+            f"{calc.out_of_range_count:,} points ({calc.out_of_range_percent:.1f}%)"
+        )
 
     def clear_result(self) -> None:
         for label in (
             self.lbl_area, self.lbl_target_coverage, self.lbl_volume,
             self.lbl_mean_thickness, self.lbl_min_thickness, self.lbl_max_thickness,
             self.lbl_std_thickness, self.lbl_num_points,
-            self.lbl_below, self.lbl_within, self.lbl_above,
+            self.lbl_below, self.lbl_within, self.lbl_above, self.lbl_out_of_range,
         ):
             label.setText("-")

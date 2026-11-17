@@ -93,6 +93,7 @@ class HTMLPDFGenerator:
             result_stats_rows=self._result_stats_rows(result),
             distribution_rows=self._distribution_rows(dist, target_min, target_max),
             chart_path=chart_path and self._escape_path(chart_path),
+            out_of_range_note=self._out_of_range_note(result),
             segment_notes=self._segment_notes(visible_layers),
             screenshot_path=self._escape_path(screenshot_path) if screenshot_path else None,
             layer_name=visible_layers_name,
@@ -182,6 +183,19 @@ class HTMLPDFGenerator:
             {'label': 'Above Target', 'value': f'{dist.above_target:,}'},
             {'label': 'Target Range', 'value': f'{target_min} - {target_max} mm'},
         ]
+
+    @staticmethod
+    def _out_of_range_note(result):
+        """Warning shown under the distribution chart when some points were
+        thicker than the measurable range (treated as noise); None if none.
+        A high share usually means the pre-scan and post-scan are misaligned."""
+        if result is None or not getattr(result, 'out_of_range_count', 0):
+            return None
+        return (
+            f'{result.out_of_range_count:,} points ({result.out_of_range_percent:.1f}%) '
+            f'exceed the measurable range ({result.max_measurable_mm:.0f} mm) and were '
+            f'excluded from the thickness figures - possibly noise.'
+        )
 
     def _format_shotcrete_applied(self, target_min, target_max):
         if target_min is None or target_max is None:

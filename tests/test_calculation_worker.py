@@ -7,7 +7,7 @@ from pps.app.workers import CalculationWorker
 def test_calculation_worker_emits_result(qtbot, monkeypatch):
     sentinel_calc, sentinel_dist = object(), object()
     monkeypatch.setattr(
-        workers_module, "run_analysis", lambda p, d, tmin, tmax: (sentinel_calc, sentinel_dist)
+        workers_module, "run_analysis", lambda p, d, tmin, tmax, max_mm: (sentinel_calc, sentinel_dist)
     )
 
     worker = CalculationWorker(np.zeros((3, 3)), np.zeros(3), 40.0, 60.0)
@@ -18,7 +18,7 @@ def test_calculation_worker_emits_result(qtbot, monkeypatch):
 
 
 def test_calculation_worker_emits_failure(qtbot, monkeypatch):
-    def boom(p, d, tmin, tmax):
+    def boom(p, d, tmin, tmax, max_mm):
         raise ValueError("bad data")
 
     monkeypatch.setattr(workers_module, "run_analysis", boom)

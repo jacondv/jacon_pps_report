@@ -1,8 +1,16 @@
 """
-Verifies the moved/restructured code reproduces the exact numbers frozen in
-tests/golden/sample_baseline.json (generated from the pre-refactor code).
-Any diff here means a behavior change slipped in — fix the new code, never
-the baseline, unless the user explicitly approves a numeric change.
+Verifies the calculation reproduces the exact numbers frozen in
+tests/golden/sample_baseline.json. Any diff here means a behavior change
+slipped in — fix the code, never the baseline, unless the user explicitly
+approves a numeric change.
+
+Approved changes so far:
+  * 2026-11-17: points above the max measurable thickness (300 mm, was a
+    500 mm cutoff to 0) are masked out of the thickness figures and the
+    distribution instead of being counted as 0; distances are no longer
+    modified in place. Cases re-baselined with tests/golden/rebaseline_cases.py.
+    The loader now takes |d| for every value; the old one left exactly -25 mm
+    negative (162 points in the sample), so distances_hash_raw changed too.
 """
 
 import hashlib
@@ -61,8 +69,8 @@ def test_analysis_matches_baseline(baseline, cloud, case_index):
     assert dist.above_target_percent == pytest.approx(expected_dist["above_target_percent"])
     assert list(dist.histogram_counts) == expected_dist["histogram_counts"]
 
-    # the in-place mutation of `distances` must still happen (§7 of the plan)
-    assert array_hash(distances) == case["distances_hash_after_mutation"]
+    # the calculation must not modify its input
+    np.testing.assert_array_equal(distances, cloud.distances)
 
 
 def test_distance_range_segment_matches_baseline(baseline, cloud):

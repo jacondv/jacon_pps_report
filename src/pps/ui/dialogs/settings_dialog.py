@@ -1,6 +1,6 @@
 """
-Settings dialog: app-wide display preferences (theme, thickness
-classification colors, default point size). Backed by AppSettings
+Settings dialog: app-wide preferences (theme, thickness classification
+colors, default point size, maximum measurable thickness). Backed by AppSettings
 (QSettings) — separate from any one Document/.ppsproj, and separate from
 the per-session "Point size" live slider in Properties dock (Settings holds
 the persisted *default* used the next time a layer is (re)colored).
@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QColorDialog,
     QComboBox,
     QDialog,
+    QDoubleSpinBox,
     QDialogButtonBox,
     QFileDialog,
     QFormLayout,
@@ -104,12 +105,36 @@ class SettingsDialog(QDialog):
         self.swatch_below = _ColorSwatchButton(settings.color_below)
         self.swatch_within = _ColorSwatchButton(settings.color_within)
         self.swatch_above = _ColorSwatchButton(settings.color_above)
+        self.swatch_out_of_range = _ColorSwatchButton(settings.color_out_of_range)
 
         colors_form.addRow("< Target Min:", self.swatch_below)
         colors_form.addRow("Target Min – Target Max:", self.swatch_within)
         colors_form.addRow("> Target Max:", self.swatch_above)
+        colors_form.addRow("> Max Measurable (noise):", self.swatch_out_of_range)
 
         layout.addWidget(colors_group)
+
+        analysis_group = QGroupBox("Thickness Analysis")
+        analysis_form = QFormLayout(analysis_group)
+        analysis_form.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
+
+        # Points thicker than this are treated as noise: left out of every
+        # thickness figure and of the distribution, but kept for the area.
+        self.max_measurable_spin = QDoubleSpinBox()
+        self.max_measurable_spin.setRange(50.0, 5000.0)
+        self.max_measurable_spin.setDecimals(0)
+        self.max_measurable_spin.setSingleStep(10.0)
+        self.max_measurable_spin.setSuffix(" mm")
+        self.max_measurable_spin.setValue(settings.max_measurable_mm)
+        self.max_measurable_spin.setToolTip(
+            "Thickness above this value is treated as noise and excluded from "
+            "the thickness figures and the distribution chart. The surface area "
+            "still includes these points."
+        )
+        select_all_on_focus(self.max_measurable_spin)
+        analysis_form.addRow("Max measurable thickness:", self.max_measurable_spin)
+
+        layout.addWidget(analysis_group)
 
         view3d_group = QGroupBox("3D View")
         view3d_form = QFormLayout(view3d_group)
@@ -174,6 +199,8 @@ class SettingsDialog(QDialog):
             color_below=self.swatch_below.hex_color,
             color_within=self.swatch_within.hex_color,
             color_above=self.swatch_above.hex_color,
+            color_out_of_range=self.swatch_out_of_range.hex_color,
+            max_measurable_mm=self.max_measurable_spin.value(),
             background_color=self.swatch_background.hex_color,
             auto_open_pdf_after_export=self.auto_open_pdf_check.isChecked(),
             report_title=self.report_title_edit.text().strip() or DEFAULT_REPORT_TITLE,

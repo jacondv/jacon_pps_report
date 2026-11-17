@@ -91,10 +91,9 @@ def load_ply(filepath: str, distance_field: str = "distances") -> PointCloudData
     
     for name in possible_names:
         try:
-            distances = np.array(vertex[name], dtype=np.float64)
-            mask = (distances > -25) & (distances < 25)
-            distances[mask] = np.abs(distances[mask])
-            distances = np.where(distances < -25, np.abs(distances), distances)
+            # Thickness is a magnitude: the sign only reflects which side
+            # of the pre-scan the post-scan point landed on.
+            distances = np.abs(np.array(vertex[name], dtype=np.float64))
 
             logger.debug("Found distance field: '%s'", name)
             break

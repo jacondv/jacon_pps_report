@@ -1,6 +1,7 @@
 """
-Persisted, app-wide display preferences: theme (Light/Dark), the three
-thickness-classification colors, and default point size.
+Persisted, app-wide preferences: theme (Light/Dark), the thickness
+classification colors, default point size, and the maximum measurable
+thickness used by the calculation.
 
 These are user preferences, not project data — they live in QSettings (like
 window geometry) rather than in Document/.ppsproj, so they carry over
@@ -9,6 +10,8 @@ between files/projects and across sessions.
 
 from PySide6.QtCore import QObject, QSettings, Signal
 
+from pps.core.calculator import DEFAULT_MAX_MEASURABLE_MM
+
 THEME_DARK = "dark"
 THEME_LIGHT = "light"
 
@@ -16,6 +19,7 @@ DEFAULT_THEME = THEME_LIGHT
 DEFAULT_COLOR_BELOW = "#ff0000"   # thickness < target_min
 DEFAULT_COLOR_WITHIN = "#00ff00"  # target_min <= thickness <= target_max
 DEFAULT_COLOR_ABOVE = "#0000ff"   # thickness > target_max
+DEFAULT_COLOR_OUT_OF_RANGE = "#87cefa"  # thickness > max_measurable (noise), light blue
 DEFAULT_POINT_SIZE = 2
 # Independent of the UI theme (Light/Dark): this color is what actually
 # ends up in the PDF report's viewport screenshot, so it must stay
@@ -77,6 +81,22 @@ class AppSettings(QObject):
     @color_above.setter
     def color_above(self, value: str) -> None:
         self._set("color_above", value)
+
+    @property
+    def color_out_of_range(self) -> str:
+        return str(self._get("color_out_of_range", DEFAULT_COLOR_OUT_OF_RANGE, str))
+
+    @color_out_of_range.setter
+    def color_out_of_range(self, value: str) -> None:
+        self._set("color_out_of_range", value)
+
+    @property
+    def max_measurable_mm(self) -> float:
+        return float(self._get("max_measurable_mm", DEFAULT_MAX_MEASURABLE_MM, float))
+
+    @max_measurable_mm.setter
+    def max_measurable_mm(self, value: float) -> None:
+        self._set("max_measurable_mm", float(value))
 
     @property
     def point_size(self) -> int:

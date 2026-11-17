@@ -385,12 +385,7 @@ class MainWindow(QMainWindow):
         self.tool_manager.on_document_reset()
         has_cloud = self.document.layer_manager.original is not None
         self.tool_toolbar.set_cloud_loaded(has_cloud)
-        self.color_legend.update(
-            hex_to_rgb(self.settings_store.color_below),
-            hex_to_rgb(self.settings_store.color_within),
-            hex_to_rgb(self.settings_store.color_above),
-            self.document.target_min, self.document.target_max,
-        )
+        self._update_color_legend(self.document.target_min, self.document.target_max)
         self.color_legend.set_visible(has_cloud)
         self._calc_result = None
         self._thickness_dist = None
@@ -429,19 +424,20 @@ class MainWindow(QMainWindow):
         self._discard_stale_calculation()
         for layer in self.document.layer_manager.layers:
             self.layer_renderer.sync(layer, target_min, target_max, self._point_size)
-        self.color_legend.update(
-            hex_to_rgb(self.settings_store.color_below),
-            hex_to_rgb(self.settings_store.color_within),
-            hex_to_rgb(self.settings_store.color_above),
-            target_min, target_max,
-        )
+        self._update_color_legend(target_min, target_max)
         self.viewport.render()
 
     def _calc_inputs(self) -> tuple:
-        """What a calculation result depends on: the targets and which
-        clouds (layers) are visible — Calculate uses the visible ones."""
+        """What a calculation result depends on: the targets, the maximum
+        measurable thickness, and which clouds (layers) are visible —
+        Calculate uses the visible ones."""
         visible_ids = tuple(layer.id for layer in self.document.layer_manager.visible_layers())
-        return (self.document.target_min, self.document.target_max, visible_ids)
+        return (
+            self.document.target_min,
+            self.document.target_max,
+            self.settings_store.max_measurable_mm,
+            visible_ids,
+        )
 
     def _discard_stale_calculation(self) -> None:
         """Drop the shown results once their inputs changed, so numbers that
@@ -454,7 +450,7 @@ class MainWindow(QMainWindow):
         self._calc_result_inputs = None
         self.results_dock.clear_result()
         self.statusBar().showMessage(
-            "Target thickness or visible clouds changed — run Calculate again", 8000
+            "Target thickness, max measurable thickness or visible clouds changed — run Calculate again", 8000
         )
 
     def _on_point_size_changed(self, size: int) -> None:
@@ -707,6 +703,18 @@ class MainWindow(QMainWindow):
             hex_to_rgb(self.settings_store.color_below),
             hex_to_rgb(self.settings_store.color_within),
             hex_to_rgb(self.settings_store.color_above),
+            hex_to_rgb(self.settings_store.color_out_of_range),
+        )
+        self.layer_renderer.set_max_measurable(self.settings_store.max_measurable_mm)
+
+    def _update_color_legend(self, target_min: float, target_max: float) -> None:
+        self.color_legend.update(
+            hex_to_rgb(self.settings_store.color_below),
+            hex_to_rgb(self.settings_store.color_within),
+            hex_to_rgb(self.settings_store.color_above),
+            target_min, target_max,
+            color_out_of_range=hex_to_rgb(self.settings_store.color_out_of_range),
+            max_measurable_mm=self.settings_store.max_measurable_mm,
         )
 
     def _on_display_settings_changed(self) -> None:
@@ -722,13 +730,9 @@ class MainWindow(QMainWindow):
                 self.document.mark_dirty()  # point size is saved in the project
         for layer in self.document.layer_manager.layers:
             self.layer_renderer.sync(layer, self.document.target_min, self.document.target_max, self._point_size)
-        self.color_legend.update(
-            hex_to_rgb(self.settings_store.color_below),
-            hex_to_rgb(self.settings_store.color_within),
-            hex_to_rgb(self.settings_store.color_above),
-            self.document.target_min, self.document.target_max,
-        )
+        self._update_color_legend(self.document.target_min, self.document.target_max)
         self.properties_dock.set_point_size_silently(self._point_size)
+        self._discard_stale_calculation()  # max measurable thickness may have changed
         self._apply_icon_colors()
         self.viewport.render()
 
@@ -776,7 +780,12 @@ class MainWindow(QMainWindow):
         QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
 
         self._calc_worker = CalculationWorker(
-            points, distances, self.document.target_min, self.document.target_max, parent=self
+            points,
+            distances,
+            self.document.target_min,
+            self.document.target_max,
+            self.settings_store.max_measurable_mm,
+            parent=self,
         )
         self._calc_worker_inputs = self._calc_inputs()
         self._calc_worker.finished_ok.connect(self._on_calc_done)
